@@ -63,3 +63,16 @@ perfect (e.g. it won't detect a column rename, only a drop+add).
 - Seed script for default roles/permissions/superuser
 - Test suite (pytest) covering auth + RBAC
 - Dockerfile + docker-compose for local dev
+
+## Phase 1: JWT auth, RBAC, DB schema, migrations, tests, Docker setup
+
+- Register/login/refresh/me endpoints with access+refresh JWTs
+- RBAC: Role/Permission models, require_permission() route guard
+- Alembic migrations + seed script for default roles/permissions
+- Password reset flow (email delivery stubbed, pending notifications service)
+- Rate limiting, structured error handling, request logging
+- pytest suite covering auth + RBAC (12 tests passing)
+- Dockerfile + docker-compose for local dev
+
+Known issue: Google OAuth2 is implemented but untested end-to-end —
+no real Google credentials configured, no test coverage yet."
