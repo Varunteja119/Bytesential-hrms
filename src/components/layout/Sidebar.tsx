@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useNavigate, useLocation } from "react-router-dom"
 
 const menuItems = [
   { icon: "🏠", label: "Dashboard", path: "/dashboard" },
@@ -13,7 +13,8 @@ const menuItems = [
 ]
 
 export default function Sidebar() {
-  const [active, setActive] = useState("Dashboard")
+  const navigate = useNavigate()
+  const location = useLocation()
 
   return (
     <div className="w-64 min-h-screen bg-gray-900 text-white flex flex-col">
@@ -28,9 +29,9 @@ export default function Sidebar() {
         {menuItems.map((item) => (
           <button
             key={item.label}
-            onClick={() => setActive(item.label)}
+            onClick={() => navigate(item.path)}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors ${
-              active === item.label
+              location.pathname === item.path
                 ? "bg-blue-600 text-white"
                 : "text-gray-400 hover:bg-gray-800 hover:text-white"
             }`}
@@ -41,7 +42,7 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      {/* User info at bottom */}
+      {/* User info */}
       <div className="p-4 border-t border-gray-700">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-sm font-bold">
