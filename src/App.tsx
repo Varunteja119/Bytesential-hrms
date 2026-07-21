@@ -8,6 +8,8 @@ import Attendance from "./pages/attendance/Attendance"
 import Leave from "./pages/leave/Leave"
 import Payroll from "./pages/payroll/Payroll"
 import AIChat from "./pages/ai-chat/AIChat"
+import Analytics from "./pages/analytics/Analytics"
+import Finance from "./pages/finance/Finance"
 
 function App() {
   return (
@@ -21,6 +23,8 @@ function App() {
       <Route path="/leave" element={<Leave />} />
       <Route path="/payroll" element={<Payroll />} />
       <Route path="/ai-chat" element={<AIChat />} />
+      <Route path="/analytics" element={<Analytics />} />
+      <Route path="/finance" element={<Finance />} />
     </Routes>
   )
 }
