@@ -4,6 +4,7 @@ import Dashboard from "./pages/dashboard/Dashboard"
 import Employees from "./pages/employees/Employees"
 import Recruitment from "./pages/recruitment/Recruitment"
 import Leave from "./pages/leave/Leave"
+import Payroll from "./pages/payroll/Payroll"
 
 function App() {
   return (
@@ -14,6 +15,7 @@ function App() {
       <Route path="/employees" element={<Employees />} />
       <Route path="/recruitment" element={<Recruitment />} />
       <Route path="/leave" element={<Leave />} />
+      <Route path="/payroll" element={<Payroll />} />
     </Routes>
   )
 }
