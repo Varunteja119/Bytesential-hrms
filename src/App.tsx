@@ -5,6 +5,7 @@ import Employees from "./pages/employees/Employees"
 import Recruitment from "./pages/recruitment/Recruitment"
 import Leave from "./pages/leave/Leave"
 import Payroll from "./pages/payroll/Payroll"
+import AIChat from "./pages/ai-chat/AIChat"
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
       <Route path="/recruitment" element={<Recruitment />} />
       <Route path="/leave" element={<Leave />} />
       <Route path="/payroll" element={<Payroll />} />
+      <Route path="/ai-chat" element={<AIChat />} />
     </Routes>
   )
 }
