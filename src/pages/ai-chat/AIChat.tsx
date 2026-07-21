@@ -30,9 +30,23 @@ const fakeResponses: Record<string, string> = {
 
 function getResponse(input: string): string {
   const key = input.toLowerCase().trim()
-  for (const [q, a] of Object.entries(fakeResponses)) {
-    if (key.includes(q.split(" ")[0]) || key === q) return a
+
+  // Exact match
+  if (fakeResponses[key]) {
+    return fakeResponses[key]
   }
+
+  // Partial match (more reliable than matching just the first word)
+  for (const [question, answer] of Object.entries(fakeResponses)) {
+    if (
+      question.includes(key) ||
+      key.includes(question)
+    ) {
+      return answer
+    }
+  }
+
+  // Default response
   return "I understand your query. Let me check the HR database and get back to you with accurate information. For complex queries, please contact your HR team directly."
 }
 
