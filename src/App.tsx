@@ -1,7 +1,7 @@
-import Dashboard from "./pages/dashboard/Dashboard"
+import Employees from "./pages/employees/Employees"
 
 function App() {
-  return <Dashboard />
+  return <Employees />
 }
 
 export default App
