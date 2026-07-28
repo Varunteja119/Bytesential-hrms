@@ -29,10 +29,19 @@ export default function Login() {
         "http://localhost:8000/api/v1/auth/login",
         { email, password }
       )
+
       const { access_token, refresh_token, user } = response.data
+
       localStorage.setItem("access_token", access_token)
       localStorage.setItem("refresh_token", refresh_token)
-      localStorage.setItem("user", JSON.stringify(user))
+
+      // Save user if exists, otherwise save email at minimum
+      if (user) {
+        localStorage.setItem("user", JSON.stringify(user))
+      } else {
+        localStorage.setItem("user", JSON.stringify({ email, full_name: email.split("@")[0] }))
+      }
+
       navigate("/dashboard")
 
     } catch (err: any) {
