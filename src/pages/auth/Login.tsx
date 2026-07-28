@@ -36,14 +36,13 @@ export default function Login() {
       navigate("/dashboard")
 
     } catch (err: any) {
-      // TEMPORARY — bypass login until backend is running
-      localStorage.setItem("access_token", "dev_token")
-      localStorage.setItem("user", JSON.stringify({
-        full_name: "Varun",
-        email: email,
-        roles: ["hr_admin"]
-      }))
-      navigate("/dashboard")
+      if (err.response?.status === 401) {
+        setError("Invalid email or password")
+      } else if (err.response?.status === 422) {
+        setError("Please enter a valid email and password")
+      } else {
+        setError("Server error — make sure backend is running on port 8000")
+      }
     } finally {
       setLoading(false)
     }
