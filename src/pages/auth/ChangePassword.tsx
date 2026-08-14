@@ -5,10 +5,11 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import axios from "axios"
+import { getToken } from "@/lib/auth"
 
-export default function Login() {
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
+export default function ChangePassword() {
+  const [current, setCurrent] = useState("")
+  const [newPass, setNewPass] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const navigate = useNavigate()
@@ -16,8 +17,13 @@ export default function Login() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
 
-    if (!email || !password) {
+    if (!current || !newPass) {
       setError("Please fill in all fields")
+      return
+    }
+
+    if (newPass.length < 8) {
+      setError("New password must be at least 8 characters")
       return
     }
 
@@ -25,30 +31,18 @@ export default function Login() {
     setError("")
 
     try {
-      // Step 1 — Login
-      const loginRes = await axios.post(
-        "http://localhost:8000/api/v1/auth/login",
-        { email, password }
+      await axios.post(
+        "http://localhost:8000/api/v1/auth/change-password",
+        { current_password: current, new_password: newPass },
+        { headers: { Authorization: `Bearer ${getToken()}` } }
       )
-      const { access_token, refresh_token } = loginRes.data
-      localStorage.setItem("access_token", access_token)
-      localStorage.setItem("refresh_token", refresh_token)
 
-      // Step 2 — Fetch user + roles
-      const meRes = await axios.get(
-        "http://localhost:8000/api/v1/auth/me",
-        { headers: { Authorization: `Bearer ${access_token}` } }
-      )
-      const user = meRes.data
+      // Update must_change_password in localStorage
+      const user = JSON.parse(localStorage.getItem("user") || "{}")
+      user.must_change_password = false
       localStorage.setItem("user", JSON.stringify(user))
 
-      // Step 3 — Check must_change_password
-      if (user.must_change_password) {
-        navigate("/change-password")
-        return
-      }
-
-      // Step 4 — Redirect based on role
+      // Redirect based on role
       const roles: string[] = user.roles || []
       if (roles.includes("admin") || roles.includes("hr_manager")) {
         navigate("/dashboard")
@@ -58,8 +52,7 @@ export default function Login() {
 
     } catch (err: any) {
       const message = err.response?.data?.error?.message
-        || err.response?.data?.detail
-        || "Server error — make sure backend is running"
+        || "Failed to change password"
       setError(message)
     } finally {
       setLoading(false)
@@ -71,13 +64,16 @@ export default function Login() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900">ByteSentinel</h1>
-          <p className="text-gray-500 mt-2">HR Management System</p>
+          <p className="text-gray-500 mt-2">Set your new password</p>
         </div>
         <Card>
           <CardHeader>
-            <CardTitle className="text-xl">Sign in to your account</CardTitle>
+            <CardTitle className="text-xl">Change Password</CardTitle>
           </CardHeader>
           <CardContent>
+            <p className="text-sm text-yellow-600 bg-yellow-50 p-3 rounded-md mb-4">
+              You must set a new password before continuing.
+            </p>
             <form onSubmit={handleSubmit} className="space-y-4">
               {error && (
                 <div className="bg-red-50 text-red-600 text-sm p-3 rounded-md">
@@ -85,34 +81,31 @@ export default function Login() {
                 </div>
               )}
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="current">Current Password</Label>
                 <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@bytesentinel.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  id="current"
+                  type="password"
+                  placeholder="Your temporary password"
+                  value={current}
+                  onChange={(e) => setCurrent(e.target.value)}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="new">New Password</Label>
                 <Input
-                  id="password"
+                  id="new"
                   type="password"
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Min 8 characters"
+                  value={newPass}
+                  onChange={(e) => setNewPass(e.target.value)}
                 />
               </div>
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Signing in..." : "Sign in"}
+                {loading ? "Saving..." : "Set New Password"}
               </Button>
             </form>
           </CardContent>
         </Card>
-        <p className="text-center text-sm text-gray-500 mt-4">
-          ByteSentinel Pvt Ltd — Internal HRMS
-        </p>
       </div>
     </div>
   )
