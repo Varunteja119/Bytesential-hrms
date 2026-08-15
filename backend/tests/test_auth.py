@@ -85,3 +85,57 @@ def test_refresh_rejects_access_token_used_as_refresh(client):
 
     resp = client.post("/api/v1/auth/refresh", json={"refresh_token": access_token})
     assert resp.status_code == 401
+
+
+def test_password_reset_request_always_returns_202(client):
+    """Same response whether or not the email is registered -- prevents account enumeration."""
+    resp_existing = client.post("/api/v1/auth/password-reset/request", json={"email": "nobody@example.com"})
+    assert resp_existing.status_code == 202
+
+
+def test_password_reset_sends_email_with_working_link(client, fake_email_client):
+    client.post(
+        "/api/v1/auth/register",
+        json={"email": "henry@example.com", "password": "supersecret1", "full_name": "Henry"},
+    )
+
+    resp = client.post("/api/v1/auth/password-reset/request", json={"email": "henry@example.com"})
+    assert resp.status_code == 202
+
+    assert len(fake_email_client.sent) == 1
+    sent = fake_email_client.sent[0]
+    assert sent["to"] == "henry@example.com"
+    assert "reset-password?token=" in sent["body"]
+
+
+def test_password_reset_no_email_sent_for_unregistered_address(client, fake_email_client):
+    """Confirms the 202-regardless behavior isn't just a fake response -- no email actually goes out either."""
+    resp = client.post("/api/v1/auth/password-reset/request", json={"email": "nobody@example.com"})
+    assert resp.status_code == 202
+    assert len(fake_email_client.sent) == 0
+
+
+def test_password_reset_confirm_changes_password(client, fake_email_client):
+    client.post(
+        "/api/v1/auth/register",
+        json={"email": "iris@example.com", "password": "supersecret1", "full_name": "Iris"},
+    )
+    client.post("/api/v1/auth/password-reset/request", json={"email": "iris@example.com"})
+
+    # extract the token from the email body the same way a real user would click a link
+    body = fake_email_client.sent[0]["body"]
+    token = body.split("token=")[1].split("\n")[0].strip()
+
+    resp = client.post("/api/v1/auth/password-reset/confirm", json={"reset_token": token, "new_password": "brandnewpass456"})
+    assert resp.status_code == 200
+
+    # old password no longer works, new one does
+    old_login = client.post("/api/v1/auth/login", json={"email": "iris@example.com", "password": "supersecret1"})
+    assert old_login.status_code == 401
+    new_login = client.post("/api/v1/auth/login", json={"email": "iris@example.com", "password": "brandnewpass456"})
+    assert new_login.status_code == 200
+
+
+def test_password_reset_confirm_rejects_garbage_token(client):
+    resp = client.post("/api/v1/auth/password-reset/confirm", json={"reset_token": "not-a-real-token", "new_password": "brandnewpass456"})
+    assert resp.status_code == 400

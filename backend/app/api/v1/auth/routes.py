@@ -7,9 +7,11 @@ from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_user
 from app.core.rate_limit import limiter
+from app.config.settings import settings
 from app.database.connection.database import get_db
 from app.database.models.user import User
 from app.database.schemas.auth import (
+    ChangePasswordRequest,
     LoginRequest,
     PasswordResetConfirm,
     PasswordResetRequest,
@@ -26,6 +28,8 @@ from app.security.jwt import (
     decode_token,
 )
 from app.security.password import hash_password, verify_password
+from app.services.email_client import EmailClient, get_email_client
+from app.services.email_templates import password_reset_email
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 logger = logging.getLogger("bytesentinel.auth")
@@ -117,22 +121,54 @@ def me(current_user: User = Depends(get_current_user)):
     return UserOut.from_orm_user(current_user)
 
 
+@router.post("/change-password", response_model=UserOut)
+def change_password(
+    payload: ChangePasswordRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+):
+    """
+    Sets a new password for the logged-in user. Clears must_change_password —
+    this is how a new hire moves off their system-generated temp password
+    (see employee_provisioning.py) and completes that onboarding step.
+    """
+    if not current_user.hashed_password or not verify_password(payload.current_password, current_user.hashed_password):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Current password is incorrect")
+
+    current_user.hashed_password = hash_password(payload.new_password)
+    current_user.must_change_password = False
+    db.commit()
+    db.refresh(current_user)
+    return UserOut.from_orm_user(current_user)
+
+
 @router.post("/password-reset/request", status_code=status.HTTP_202_ACCEPTED)
 @limiter.limit("3/minute")
-def request_password_reset(request: Request, payload: PasswordResetRequest, db: Session = Depends(get_db)):
+def request_password_reset(
+    request: Request,
+    payload: PasswordResetRequest,
+    db: Session = Depends(get_db),
+    email_client: EmailClient = Depends(get_email_client),
+):
     """
     Always returns 202 regardless of whether the email exists — a differing
     response here would let an attacker enumerate registered accounts.
 
-    NOTE: actual email delivery isn't wired up yet (that's the notifications
-    service, planned for a later phase). For now the reset link is logged
-    server-side so the flow is testable end-to-end; swap this for a call
-    into the email service once it exists.
+    Email delivery failures are logged but never surfaced to the caller
+    (same reasoning: don't leak account existence, and don't make a flaky
+    SMTP server break an otherwise-correct API contract). The token is also
+    logged server-side as a fallback in case delivery fails, so the flow
+    stays testable even without a working SMTP server.
     """
     user = db.query(User).filter(User.email == payload.email).first()
     if user is not None:
         reset_token = create_reset_token(str(user.id))
         logger.info("Password reset requested for %s. Token: %s", user.email, reset_token)
+
+        subject, body = password_reset_email(reset_token, f"{settings.frontend_url}/reset-password")
+        try:
+            email_client.send(user.email, subject, body)
+        except Exception:
+            logger.error("Password reset email failed to send to %s (token still valid, logged above)", user.email)
+
     return {"message": "If that email is registered, a reset link has been sent."}
 
 

@@ -10,6 +10,7 @@ class UserOut(BaseModel):
     email: EmailStr
     full_name: str
     is_active: bool
+    must_change_password: bool
     roles: list[str] = []
 
     @classmethod
@@ -20,5 +21,6 @@ class UserOut(BaseModel):
             email=user.email,
             full_name=user.full_name,
             is_active=user.is_active,
+            must_change_password=user.must_change_password,
             roles=[r.name for r in user.roles],
         )

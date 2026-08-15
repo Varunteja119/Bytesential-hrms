@@ -16,6 +16,12 @@ class User(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False)
 
+    # Set True when an account is created with a system-generated temp password
+    # (see employee_provisioning.py) — cleared once the user sets their own
+    # password via POST /auth/change-password. Self-registered accounts and the
+    # seeded superuser default to False (they set their own password at creation).
+    must_change_password: Mapped[bool] = mapped_column(Boolean, default=False)
+
     # set when the user signs in via Google OAuth2 instead of a password
     oauth_provider: Mapped[str | None] = mapped_column(String(50))
     oauth_sub: Mapped[str | None] = mapped_column(String(255))

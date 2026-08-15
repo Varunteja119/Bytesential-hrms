@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     environment: str = "development"
     debug: bool = True
     api_v1_prefix: str = "/api/v1"
+    frontend_url: str = "http://localhost:3000"  # used to build links in emails (login, password reset)
 
     # Database
     database_url: str
@@ -33,6 +34,28 @@ class Settings(BaseSettings):
     google_client_id: str | None = None
     google_client_secret: str | None = None
     google_redirect_uri: str | None = None
+
+    # LLM (Ollama)
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_model: str = "qwen2.5:7b"
+    ollama_embedding_model: str = "nomic-embed-text"
+
+    # Object storage (MinIO, S3-compatible)
+    minio_endpoint_url: str = "http://localhost:9000"
+    minio_access_key: str = "minioadmin"
+    minio_secret_key: str = "minioadmin123"
+    minio_bucket_resumes: str = "resumes"
+
+    # Vector store (ChromaDB)
+    chroma_persist_dir: str = "./chroma_data"
+
+    # Email (SMTP)
+    smtp_host: str = "localhost"
+    smtp_port: int = 587
+    smtp_username: str | None = None
+    smtp_password: str | None = None
+    smtp_from_email: str = "no-reply@bytesentinel.local"
+    smtp_use_tls: bool = True
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

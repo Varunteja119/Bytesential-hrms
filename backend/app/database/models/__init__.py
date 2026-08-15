@@ -5,3 +5,5 @@ grows as you add employee.py, leave.py, payroll.py, etc. in later phases.
 """
 from app.database.models.user import User  # noqa: F401
 from app.database.models.rbac import Role, Permission  # noqa: F401
+from app.database.models.recruitment import Job, Candidate  # noqa: F401
+from app.database.models.employee import Employee, EmployeeDocument  # noqa: F401
