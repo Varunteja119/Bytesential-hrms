@@ -10,6 +10,7 @@ const hrMenuItems = [
   { icon: "💰", label: "Payroll", path: "/payroll" },
   { icon: "📊", label: "Analytics", path: "/analytics" },
   { icon: "🧾", label: "Finance", path: "/finance" },
+  { icon: "🔄", label: "Provision Employee", path: "/hr/provision" },
   { icon: "✅", label: "Verification Queue", path: "/hr/verification" },
   { icon: "🤖", label: "AI Assistant", path: "/ai-chat" },
 ]
@@ -25,12 +26,8 @@ export default function Sidebar() {
   let user: any = {}
   try {
     const stored = localStorage.getItem("user")
-    if (stored && stored !== "undefined") {
-      user = JSON.parse(stored)
-    }
-  } catch {
-    user = {}
-  }
+    if (stored && stored !== "undefined") user = JSON.parse(stored)
+  } catch { user = {} }
 
   const initials = user?.full_name
     ? user.full_name.split(" ").map((n: string) => n[0]).join("").toUpperCase()
@@ -52,7 +49,7 @@ export default function Sidebar() {
         <p className="text-gray-400 text-xs mt-1">HR Management</p>
       </div>
 
-      <nav className="flex-1 p-4 space-y-1">
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
         {menuItems.map((item) => (
           <button
             key={item.label}
