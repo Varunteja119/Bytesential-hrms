@@ -7,6 +7,7 @@ import Recruitment from "./pages/recruitment/Recruitment"
 import Leave from "./pages/leave/Leave"
 import Payroll from "./pages/payroll/Payroll"
 import AIChat from "./pages/ai-chat/AIChat"
+import Attendance from "./pages/attendance/Attendance"
 import ProtectedRoute from "./components/ProtectedRoute"
 
 function App() {
@@ -23,6 +24,9 @@ function App() {
       <Route path="/leave" element={<ProtectedRoute roles={["hr_manager", "admin"]}><Leave /></ProtectedRoute>} />
       <Route path="/payroll" element={<ProtectedRoute roles={["hr_manager", "admin"]}><Payroll /></ProtectedRoute>} />
       <Route path="/ai-chat" element={<ProtectedRoute roles={["hr_manager", "admin"]}><AIChat /></ProtectedRoute>} />
+      <Route path="/attendance" element={<ProtectedRoute roles={["hr_manager", "admin"]}><Attendance /></ProtectedRoute>} />
+      <Route path="/analytics" element={<ProtectedRoute roles={["hr_manager", "admin"]}><div className="p-8"><h1 className="text-2xl font-bold">Analytics — Coming Soon</h1></div></ProtectedRoute>} />
+      <Route path="/finance" element={<ProtectedRoute roles={["hr_manager", "admin"]}><div className="p-8"><h1 className="text-2xl font-bold">Finance — Coming Soon</h1></div></ProtectedRoute>} />
 
       {/* Employee only */}
       <Route path="/onboarding" element={<ProtectedRoute><div className="p-8"><h1 className="text-2xl font-bold">Onboarding Portal — Coming Soon</h1></div></ProtectedRoute>} />
