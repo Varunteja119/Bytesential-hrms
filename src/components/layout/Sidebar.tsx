@@ -1,6 +1,7 @@
 import { useNavigate, useLocation } from "react-router-dom"
+import { isHRManager } from "@/lib/auth"
 
-const menuItems = [
+const hrMenuItems = [
   { icon: "🏠", label: "Dashboard", path: "/dashboard" },
   { icon: "👥", label: "Employees", path: "/employees" },
   { icon: "📋", label: "Recruitment", path: "/recruitment" },
@@ -9,7 +10,12 @@ const menuItems = [
   { icon: "💰", label: "Payroll", path: "/payroll" },
   { icon: "📊", label: "Analytics", path: "/analytics" },
   { icon: "🧾", label: "Finance", path: "/finance" },
+  { icon: "✅", label: "Verification Queue", path: "/hr/verification" },
   { icon: "🤖", label: "AI Assistant", path: "/ai-chat" },
+]
+
+const employeeMenuItems = [
+  { icon: "📋", label: "My Onboarding", path: "/onboarding" },
 ]
 
 export default function Sidebar() {
@@ -29,6 +35,8 @@ export default function Sidebar() {
   const initials = user?.full_name
     ? user.full_name.split(" ").map((n: string) => n[0]).join("").toUpperCase()
     : "U"
+
+  const menuItems = isHRManager() ? hrMenuItems : employeeMenuItems
 
   function handleLogout() {
     localStorage.removeItem("access_token")
