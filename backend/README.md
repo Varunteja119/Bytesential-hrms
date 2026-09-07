@@ -1,33 +1,32 @@
-# ByteSentinel Backend — Phase 1
-
-Foundation: authentication (JWT + Google OAuth2), RBAC, database schema, API architecture.
+# ByteSentinel Backend — Phase 1 + Phase 2 + Phase 3
 
 ## Local dev (without Docker)
 
 ```bash
-cp .env.example .env               # fill in SECRET_KEY (openssl rand -hex 32) and a real Postgres DATABASE_URL
+cp .env.example .env
 pip install -r requirements.txt --break-system-packages
-alembic upgrade head               # apply schema
-python -m scripts.seed.seed_rbac   # create default roles/permissions + a superuser
+alembic upgrade head
+python -m app.database.seed.seed_rbac
+python -m app.database.seed.seed_payroll_config
 uvicorn app.main:app --reload
 ```
 
 Swagger UI: http://localhost:8000/api/docs
-
 Default seeded superuser: `admin@bytesentinel.com` / `ChangeMe123!`
-(override via `SEED_SUPERUSER_EMAIL` / `SEED_SUPERUSER_PASSWORD` env vars — change the password immediately in any shared environment).
 
 ## Local dev (with Docker)
 
 ```bash
-docker compose up -d postgres redis
-docker compose run --rm migrate     # applies migrations + seeds RBAC data
+docker compose up -d postgres redis minio ollama mailpit pgadmin
+docker compose exec ollama ollama pull qwen2.5:7b
+docker compose exec ollama ollama pull nomic-embed-text
+docker compose run --rm migrate
 docker compose up backend
 ```
 
-> Note: the docker-compose config here is written to the standard spec but hasn't been
-> build-tested against a live Docker daemon in this environment — sanity-check `docker
-compose up` locally before relying on it.
+The `migrate` service runs both seed scripts automatically. To also run the
+Celery worker (not required for anything synchronous today — see Known
+Issues): `docker compose up celery_worker`.
 
 ## Tests
 
@@ -35,137 +34,83 @@ compose up` locally before relying on it.
 python -m pytest tests/ -v
 ```
 
-Tests run against an isolated in-memory SQLite DB (see `tests/conftest.py`) — no real
-Postgres needed to run the suite.
 
-## Adding a new migration
-
-After changing/adding a model in `app/database/models/`:
-
-```bash
-alembic revision --autogenerate -m "add employee table"
-alembic upgrade head
-```
-
-Always read the generated migration before applying it — autogenerate is good but not
-perfect (e.g. it won't detect a column rename, only a drop+add).
-
-**Known noise:** if you generate migrations against a local SQLite DB (as this project's
-own migrations were developed against, absent a live Postgres in that environment),
-autogenerate will falsely report every existing UUID column as `NUMERIC -> UUID`. This
-is a SQLite-reflection artifact (SQLite has no native UUID type) — those `alter_column`
-calls do nothing real and were manually stripped from this project's migration files.
-If you generate migrations against your actual Postgres instance instead, you won't see
-this at all — worth doing once Postgres is your default local dev DB.
+87 tests, all passing, no live external services required (Ollama/MinIO/SMTP/Celery are all faked or called directly in tests).
 
 ## Known Issues
 
-- **Google OAuth2 login is untested end-to-end.** The code (`app/api/v1/auth/oauth.py`)
-  follows the standard Authlib pattern, but no one has run it against real Google Cloud
-  Console credentials yet (`GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` are blank in
-  `.env.example`), and there's no automated test coverage for it.
+- **Google OAuth2** — implemented, untested against real credentials.
+- **Ollama LLM client** — implemented, untested against a live Ollama instance.
+- **MinIO storage client** — implemented, untested against a live MinIO instance.
+- **Email/SMTP** — implemented and tested with a fake client; untested against real SMTP. `docker compose up mailpit` gives a local catcher at http://localhost:8025.
+- **Celery worker** — implemented (`app/workers/celery_app.py`, `app/tasks/payroll_tasks.py`), the task logic is tested directly as a function call, but never run through a live broker/worker in this environment. Not currently wired into any API route (routes call the business logic synchronously) — the task exists as the documented next step once payroll's employee count needs async processing.
+- **ChromaDB vector store** — verified end-to-end, runs in-process.
+- **Payroll statutory rates (PF/ESI/PT) are PLACEHOLDER values**, stored as data in `PayrollConfig` (not hardcoded), specifically so they're updatable via `PATCH /payroll/config` without a code change once real numbers are confirmed with HR/Finance/legal. **Do not run real payroll against the seeded defaults.** TDS is never auto-calculated — it's a manually-entered amount per payslip.
 
-- **Ollama LLM integration (`app/services/llm_client.py`) is untested against a live
-  Ollama instance.** The HTTP contract follows Ollama's documented `/api/generate` and
-  `/api/embeddings` endpoints, but was only verified with a fake client in tests. Before
-  relying on it: `docker compose up ollama`, pull a model (`docker compose exec ollama
-ollama pull qwen2.5:7b` and `... pull nomic-embed-text`), then run a real screening
-  call and confirm the response shape matches what `parse_screening_response()` expects.
+## Project structure note
 
-- **MinIO storage integration (`app/services/storage.py`) is untested against a live
-  MinIO instance.** Standard boto3 S3-client usage, verified only with an in-memory fake
-  in tests. Confirm `docker compose up minio` + a real resume upload works before
-  depending on it.
+This backend was restructured partway through Phase 3 to match a structure
+mandated by the team lead (see the ByteSentinel repo tree). Completed:
+`core/` split into `middleware/`, `dependencies/`, `logging/`; `migrations/`
+and `seed/` moved under `app/database/`; email templates moved to real files
+under `app/templates/emails/`; `onboarding/` and `documents/` split into their
+own `api/v1/` modules (URLs deliberately unchanged — see below); `workers/`,
+`tasks/`, `scheduler/` added with a real Celery task for payroll.
+**Not done:** a `database/repositories/` layer (routes/business logic still
+query SQLAlchemy directly), dedicated `api/v1/roles/` and `api/v1/permissions/`
+CRUD endpoints (roles/permissions are seed-managed only).
 
-- **Email/SMTP integration (`app/services/email_client.py`) is untested against a live
-  SMTP server.** Standard `smtplib` usage, verified only with a fake client in tests
-  (`FakeEmailClient` in `tests/conftest.py`) — content/recipient/timing are all tested,
-  actual delivery is not. `docker compose up mailpit` gives you a local SMTP catcher
-  with a web UI at `http://localhost:8025` to see exactly what gets sent without
-  needing real mail credentials — confirm a password reset and an employee welcome
-  email both arrive there before trusting this in anything real. This closes what was
-  previously a complete gap (nothing sent email at all, only logged) — welcome emails
-  (with temp password) and password reset emails are both wired in now.
+**Important:** `onboarding/` and `documents/` route handlers live in their own
+files per the mandated structure, but are still mounted at the original
+`/employees/...` URL prefix — this was deliberate, since the frontend team was
+already integrating against those exact paths when the restructuring happened.
+Changing the file a handler lives in did not change any URL, request shape,
+or response shape anywhere in this restructuring.
 
-- **ChromaDB vector store IS verified** (`app/services/vector_store.py`) — it runs
-  in-process, so unlike the three above, this one has been tested end-to-end with real
-  embeddings/queries, not just fakes. You may see `Failed to send telemetry event`
-  warnings in logs from this ChromaDB version — cosmetic only, doesn't affect results.
+## What's covered
 
-**JWT auth, RBAC, DB schema/migrations, and the recruitment/employee/onboarding
-pipelines are all tested and working.** Don't build frontend integration against
-Google OAuth, live LLM scoring, live resume/document upload, or live email delivery
-until the items above are verified and this note is updated.
+**Phase 3c — Payroll:** Two-step approval workflow (HR → Finance, matching the
+SRS's documented chain), attendance-driven proration (unmarked days = Loss of
+Pay, deducted from gross before net salary), salary structure with revision
+history (`SalaryStructure` rows keyed by `effective_from`, not one row per
+employee). `PayrollConfig` holds PF/ESI/PT rates as **editable data**, not
+hardcoded constants — see Known Issues above for why, and don't run real
+payroll against the seeded placeholder values. TDS/overtime/bonus are
+manually adjustable per payslip before HR approval locks it. A `finance_manager`
+role was added (`payroll:approve_finance`) distinct from `hr_manager`
+(`payroll:approve_hr`), since the SRS treats these as separate approval steps.
+13 tests, including the full approval chain, an RBAC boundary test (HR cannot
+finance-approve even holding `payroll:approve_hr`), and an LOP proration
+scenario verified against hand-calculated expected values before being wired
+into the API at all.
 
-## What's covered — Email/notifications
+**Phase 3b — Leave:** Apply/approve/reject/cancel workflow with real balance
+tracking per (employee, leave_type, year). ⚠️ ASSUMPTIONS (SRS doesn't specify
+exact policy): annual allocations are casual=12, sick=12, earned=15, unpaid=uncapped
+(`LEAVE_ALLOCATIONS` in `app/business/leave.py`); day counting is calendar days
+inclusive, no weekend/holiday exclusion. **Approving a leave request writes
+`ON_LEAVE` records into the Attendance table for every day in the range** — this
+is the actual "Attendance → Leave" connection the SRS workflow diagram shows, not
+two disconnected modules that merely share an employee_id. Overlapping leave
+requests are rejected. 13 tests, including one that verifies the Attendance
+write-back actually happens with the correct dates and status.
 
-- Welcome email (employee code + temp password) sent on employee provisioning
-- Password reset email (with working reset link) sent on reset request
-- Both are best-effort: a down SMTP server logs an error but doesn't fail the
-  underlying action (provisioning still succeeds, password reset still returns 202) —
-  the temp password is also still returned in the API response as a fallback delivery
-  path until email delivery is verified reliable
-- 8 new tests: 2 pure template tests + 6 integration tests asserting actual email
-  content/recipients via a fake SMTP client (previously: zero tests existed for
-  password reset at all, in any phase)
+**Phase 3a — Attendance:** Self-service check-in/check-out with real business rules
+(can't check in twice, can't check out without checking in first), late-arrival
+detection and half-day marking based on configurable thresholds (`work_start_hour`,
+`late_grace_minutes`, `half_day_hours_threshold` in settings — SRS doesn't specify
+exact company policy numbers, these are sensible defaults meant to be adjusted).
+HR can view any employee's attendance and manually mark/correct records (holidays,
+absences). 13 tests, including a real timezone bug caught and fixed during
+development (SQLite doesn't preserve timezone info on round-trip, unlike Postgres —
+worth knowing if similar datetime arithmetic gets added elsewhere).
 
-## What's covered in Phase 2c — Onboarding
+**Phase 1:** JWT auth (register/login/refresh/me/change-password), Google OAuth2 (untested), RBAC, DB schema, Alembic migrations, seed script, rate limiting, structured error handling, request logging.
 
-- **Fixed a real gap found in 2b's activation logic**: activation previously only
-  checked for _unverified_ documents, which passed vacuously when an employee had
-  uploaded _zero_ documents. Activation now requires three specific document types
-  (Aadhaar, PAN, bank proof — `app/business/onboarding.py:REQUIRED_DOCUMENT_TYPES`)
-  to be both present and verified.
-- Forced password change: new hires get `must_change_password=True` on provisioning;
-  `POST /auth/change-password` clears it. Activation is now also blocked until this
-  happens — a temp password can no longer be the account's permanent password.
-- Onboarding status/checklist endpoints (`GET /employees/me/onboarding-status` and
-  `/employees/{id}/onboarding-status`) — shows exactly what's outstanding: password
-  changed?, profile complete?, which required documents are uploaded/verified?,
-  ready for activation?
-- 7 new tests, all passing, specifically targeting the gap above and each activation
-  precondition independently
+**Phase 2a — Recruitment:** Jobs + Candidates with a state-machine pipeline (applied → screening → interview → hr_approval → offered → accepted/rejected/withdrawn), AI resume screening (upload, parse, LLM scoring, ChromaDB similarity search).
 
-## What's covered in Phase 2b — Employee Management
+**Phase 2b — Employee Management:** Candidate → Employee provisioning, self-service profile vs HR-only fields, document upload + verification.
 
-- Employee provisioning: converts an ACCEPTED candidate into a real User + Employee
-  account, generating a sequential employee code and a one-time temp password (no
-  email delivery yet — same known limitation as password reset, see below)
-- Self-service profile completion (phone, address, DOB, bank details, Aadhaar/PAN) —
-  separate from HR-only fields (department, designation, manager, status), enforced
-  at the schema level so an employee literally cannot submit a department change
-- Document upload (Aadhaar, PAN, certificates, bank proof) + HR verification workflow
-- Activation gate: employment_status only flips to ACTIVE once profile is complete
-  AND all uploaded documents are HR-verified — matches the SRS's documented
-  "HR verifies and activates employee account" step
-- 9 tests covering the full path: provision → temp-password login → profile
-  completion → document upload → HR verification → activation, plus the RBAC
-  boundary (an employee cannot view another employee's record)
+**Phase 2c — Onboarding:** Forced password change off temp password, required-document-type activation gate (Aadhaar/PAN/bank proof), onboarding status checklist endpoints.
 
-## What's covered in Phase 2a — Recruitment
-
-- Job postings + Candidates with a real state-machine pipeline (applied → screening →
-  interview → hr_approval → offered → accepted/rejected/withdrawn) — illegal transitions
-  are rejected, not just accepted and ignored
-- Resume upload (PDF/DOCX) with text extraction, cached on the candidate record
-- AI resume screening: builds a prompt from job requirements + resume text, calls the
-  LLM, robustly parses its response (handles markdown-fenced JSON, preambles, etc.),
-  stores score + summary, auto-advances the candidate's pipeline stage
-- Candidate resume embeddings indexed in ChromaDB; "find similar candidates for this
-  job" endpoint using real vector similarity search across the whole candidate pool
-- All AI service integrations (LLM, storage, vector store) are behind abstract
-  interfaces with dependency injection — swappable and independently testable
-
-## What's covered in Phase 1
-
-- JWT access/refresh tokens + Google OAuth2 login
-- RBAC (Role/Permission, `require_permission()` route guard)
-- Password reset flow (reset-token email delivery is stubbed — logged, not sent — until
-  the notifications service exists in a later phase)
-- Rate limiting on login (5/min) and password-reset requests (3/min)
-- Global exception handling (consistent JSON error shape, no raw tracebacks leaked)
-- Request logging middleware (method/path/status/duration/request-id per request)
-- Alembic migrations
-- Seed script for default roles/permissions/superuser
-- Test suite (pytest) covering auth + RBAC
-- Dockerfile + docker-compose for local dev
+**Email/Notifications:** Welcome email (temp password) on provisioning, password reset email — both best-effort (failures logged, don't break the underlying action).

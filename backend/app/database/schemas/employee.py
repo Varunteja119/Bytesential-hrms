@@ -1,8 +1,6 @@
 import uuid
 from datetime import date
-
 from pydantic import BaseModel, ConfigDict, Field
-
 from app.database.models.employee import DocumentType, EmploymentStatus
 
 
@@ -15,7 +13,6 @@ class ProvisionEmployeeRequest(BaseModel):
 
 class EmployeeOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-
     id: uuid.UUID
     employee_code: str
     user_id: uuid.UUID
@@ -25,7 +22,6 @@ class EmployeeOut(BaseModel):
     date_of_joining: date
     reporting_manager_id: uuid.UUID | None
     employment_status: EmploymentStatus
-
     phone: str | None
     address: str | None
     date_of_birth: date | None
@@ -35,7 +31,6 @@ class EmployeeOut(BaseModel):
     bank_account_number: str | None
     bank_ifsc: str | None
     bank_name: str | None
-
     profile_completed: bool
     hr_verified: bool
 
@@ -46,9 +41,6 @@ class ProvisionEmployeeResponse(BaseModel):
 
 
 class EmployeeProfileUpdate(BaseModel):
-    """Self-service fields — what the employee themself can fill in during onboarding.
-    Deliberately excludes department/designation/status/manager — those are HR-only."""
-
     phone: str | None = None
     address: str | None = None
     date_of_birth: date | None = None
@@ -61,8 +53,6 @@ class EmployeeProfileUpdate(BaseModel):
 
 
 class EmployeeAdminUpdate(BaseModel):
-    """HR-only fields."""
-
     department: str | None = None
     designation: str | None = None
     reporting_manager_id: uuid.UUID | None = None
@@ -71,7 +61,6 @@ class EmployeeAdminUpdate(BaseModel):
 
 class EmployeeDocumentOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-
     id: uuid.UUID
     employee_id: uuid.UUID
     document_type: DocumentType

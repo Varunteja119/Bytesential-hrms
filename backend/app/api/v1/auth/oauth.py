@@ -1,18 +1,3 @@
-"""
-Google OAuth2 login (Authorization Code flow).
-
-⚠️ KNOWN ISSUE — untested end-to-end. This code is implemented per the
-standard Authlib pattern, but has not been run against real Google OAuth
-credentials (no GOOGLE_CLIENT_ID/SECRET configured yet, no test coverage
-in tests/). Treat as unverified until someone runs the full redirect ->
-consent -> callback flow with real Google Cloud Console credentials and
-confirms it works. JWT auth, RBAC, DB schema, and migrations are the
-tested/working parts of this codebase — this file is not.
-
-Kept separate from routes.py because it's a distinct concern (redirect +
-callback dance) and because you may add more providers (Microsoft is
-common for enterprise HR) later — each gets its own file registered here.
-"""
 from authlib.integrations.starlette_client import OAuth
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
@@ -50,21 +35,10 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
 
     email = userinfo["email"]
     user = db.query(User).filter(User.email == email).first()
-
     if user is None:
-        # first-time Google login -> auto-provision the account.
-        # hashed_password stays null: this account can only log in via Google.
-        user = User(
-            email=email,
-            full_name=userinfo.get("name", email),
-            oauth_provider="google",
-            oauth_sub=userinfo["sub"],
-        )
+        user = User(email=email, full_name=userinfo.get("name", email), oauth_provider="google", oauth_sub=userinfo["sub"])
         db.add(user)
         db.commit()
         db.refresh(user)
 
-    return TokenResponse(
-        access_token=create_access_token(str(user.id)),
-        refresh_token=create_refresh_token(str(user.id)),
-    )
+    return TokenResponse(access_token=create_access_token(str(user.id)), refresh_token=create_refresh_token(str(user.id)))

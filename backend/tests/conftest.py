@@ -1,12 +1,3 @@
-"""
-Test fixtures.
-
-Uses an in-memory SQLite DB per test (via a StaticPool so the single
-connection is shared across the request thread), overriding the app's
-`get_db` dependency. This keeps tests fast and fully isolated from
-whatever Postgres instance is configured in .env — no real DB needed to
-run the suite.
-"""
 import os
 
 os.environ.setdefault("SECRET_KEY", "test-secret-key")
@@ -25,14 +16,7 @@ from app.services.email_client import get_email_client
 
 
 class FakeEmailClient:
-    """Captures sent emails in memory instead of hitting real SMTP.
-
-    Without this override, every test that triggers an email (password
-    reset, employee provisioning) was making a real smtplib connection
-    attempt to localhost:587, which doesn't exist in the test environment
-    and was silently timing out after 10s each — inflating the suite's
-    runtime substantially. This fixes that AND makes email content
-    actually assertable."""
+    """Captures sent emails in memory instead of hitting real SMTP."""
 
     def __init__(self):
         self.sent: list[dict] = []
@@ -67,7 +51,7 @@ def fake_email_client():
 def client(db_session, fake_email_client):
     from app.core.rate_limit import limiter
 
-    limiter.reset()  # all tests share one process -> one in-memory limiter; reset per test
+    limiter.reset()
 
     def _override_get_db():
         try:

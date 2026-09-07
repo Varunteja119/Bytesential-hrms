@@ -1,15 +1,3 @@
-"""
-Object storage abstraction (MinIO / S3-compatible).
-
-Same reasoning as llm_client.py: an interface so screening/upload logic
-is testable without a live MinIO instance, and so this can point at real
-AWS S3 in production later without touching call sites.
-
-⚠️ MinIOStorageClient is UNTESTED against a live MinIO instance in this
-environment (no object storage server available here). Standard boto3
-S3-client usage against MinIO's S3-compatible API — verify end-to-end
-once MinIO is running. See README Known Issues.
-"""
 from typing import Protocol
 
 import boto3
@@ -27,12 +15,7 @@ class StorageClient(Protocol):
 class MinIOStorageClient:
     def __init__(self, endpoint_url: str, access_key: str, secret_key: str, bucket: str):
         self.bucket = bucket
-        self._client = boto3.client(
-            "s3",
-            endpoint_url=endpoint_url,
-            aws_access_key_id=access_key,
-            aws_secret_access_key=secret_key,
-        )
+        self._client = boto3.client("s3", endpoint_url=endpoint_url, aws_access_key_id=access_key, aws_secret_access_key=secret_key)
         self._ensure_bucket()
 
     def _ensure_bucket(self) -> None:
@@ -58,7 +41,6 @@ class MinIOStorageClient:
 
 
 def get_storage_client() -> StorageClient:
-    """FastAPI dependency — override with a fake in tests."""
     return MinIOStorageClient(
         endpoint_url=settings.minio_endpoint_url,
         access_key=settings.minio_access_key,

@@ -1,11 +1,7 @@
 import uuid
-
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
-
 from app.database.models.recruitment import CandidateStatus, JobStatus
 
-
-# --- Job ---
 
 class JobCreate(BaseModel):
     title: str = Field(min_length=1, max_length=200)
@@ -24,7 +20,6 @@ class JobUpdate(BaseModel):
 
 class JobOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-
     id: uuid.UUID
     title: str
     department: str
@@ -35,18 +30,9 @@ class JobOut(BaseModel):
 
     @classmethod
     def from_orm_job(cls, job) -> "JobOut":
-        return cls(
-            id=job.id,
-            title=job.title,
-            department=job.department,
-            description=job.description,
-            requirements=job.requirements,
-            status=job.status,
-            candidate_count=len(job.candidates),
-        )
+        return cls(id=job.id, title=job.title, department=job.department, description=job.description,
+                    requirements=job.requirements, status=job.status, candidate_count=len(job.candidates))
 
-
-# --- Candidate ---
 
 class CandidateCreate(BaseModel):
     full_name: str = Field(min_length=1, max_length=150)
@@ -62,7 +48,6 @@ class CandidateStatusUpdate(BaseModel):
 
 class CandidateOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-
     id: uuid.UUID
     full_name: str
     email: EmailStr

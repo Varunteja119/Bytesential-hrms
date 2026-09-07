@@ -1,0 +1,132 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: bytesentinel
+      POSTGRES_PASSWORD: bytesentinel123
+      POSTGRES_DB: hrms_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bytesentinel"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+
+  pgadmin:
+    image: dpage/pgadmin4
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@bytesentinel.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+
+  ollama:
+    image: ollama/ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    # After first `docker compose up ollama`, pull models with:
+    #   docker compose exec ollama ollama pull qwen2.5:7b
+    #   docker compose exec ollama ollama pull nomic-embed-text
+
+  mailpit:
+    image: axllent/mailpit
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # Web UI -- view sent emails at http://localhost:8025
+
+  # One-off: applies migrations then seeds default roles/permissions/superuser, then exits.
+  migrate:
+    build: ./backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SECRET_KEY: "13d7c32dca2b4455d0004b928f1e261065eefddf450510ee35e52d9709ae6a0f"
+      DATABASE_URL: postgresql+psycopg2://bytesentinel:bytesentinel123@postgres:5432/hrms_db
+      SEED_SUPERUSER_EMAIL: ${SEED_SUPERUSER_EMAIL:-admin@bytesentinel.com}
+      SEED_SUPERUSER_PASSWORD: ${SEED_SUPERUSER_PASSWORD:-ChangeMe123!}
+    command: sh -c "alembic upgrade head && python -m app.database.seed.seed_rbac && python -m app.database.seed.seed_payroll_config"
+
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      SECRET_KEY: "13d7c32dca2b4455d0004b928f1e261065eefddf450510ee35e52d9709ae6a0f"
+      DATABASE_URL: postgresql+psycopg2://bytesentinel:bytesentinel123@postgres:5432/hrms_db
+      REDIS_URL: redis://redis:6379/0
+      DEBUG: "true"
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      MINIO_ENDPOINT_URL: http://minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin123
+      CHROMA_PERSIST_DIR: /app/chroma_data
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      SMTP_USE_TLS: "false"
+      MOCK_LLM: "false"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./backend:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+  # Celery worker -- processes background tasks (e.g. app/tasks/payroll_tasks.py).
+  # NOTE: not currently required for anything the API routes call synchronously
+  # today; this exists so the task infrastructure is testable end-to-end once
+  # a route actually enqueues work via .delay() instead of running inline.
+  celery_worker:
+    build: ./backend
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      SECRET_KEY: "13d7c32dca2b4455d0004b928f1e261065eefddf450510ee35e52d9709ae6a0f"
+      DATABASE_URL: postgresql+psycopg2://bytesentinel:bytesentinel123@postgres:5432/hrms_db
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - ./backend:/app
+    command: celery -A app.workers.celery_app worker --loglevel=info
+
+volumes:
+  postgres_data:
+  minio_data:
+  ollama_data:

@@ -1,45 +1,29 @@
 """
-Email content templates.
+Email content, rendered from template files under app/templates/emails/.
 
-Plain Python functions rather than Jinja/templates-on-disk — there are
-only two emails right now and neither needs conditional logic or partials.
-If the template count grows past a handful, revisit and move these into
-app/templates/emails/ as real files per the architecture doc's layout.
+Previously these were Python f-strings inline in this module. Moved to real
+template files per the mandated project structure — same public function
+signatures (`welcome_email(...)`, `password_reset_email(...)` both still
+return `(subject, body)`), so `email_client` callers and tests didn't need
+to change.
 """
+from pathlib import Path
+
+from jinja2 import Environment, FileSystemLoader
+
+_TEMPLATES_DIR = Path(__file__).resolve().parents[1] / "templates" / "emails"
+_env = Environment(loader=FileSystemLoader(str(_TEMPLATES_DIR)), autoescape=False)
 
 
 def welcome_email(full_name: str, employee_code: str, temp_password: str, login_url: str) -> tuple[str, str]:
-    """Returns (subject, body). Sent on employee provisioning."""
     subject = "Welcome to ByteSentinel — Your Account is Ready"
-    body = f"""Hi {full_name},
-
-Welcome aboard! Your employee account has been created.
-
-  Employee ID: {employee_code}
-  Temporary Password: {temp_password}
-
-Please log in at {login_url} and change your password before continuing —
-you won't be able to complete onboarding until you do.
-
-If you have any questions, reach out to HR.
-
-— ByteSentinel HR
-"""
+    template = _env.get_template("welcome_email.txt")
+    body = template.render(full_name=full_name, employee_code=employee_code, temp_password=temp_password, login_url=login_url)
     return subject, body
 
 
 def password_reset_email(reset_token: str, reset_url: str) -> tuple[str, str]:
-    """Returns (subject, body). Sent on password reset request."""
     subject = "Reset Your ByteSentinel Password"
-    body = f"""Hi,
-
-We received a request to reset your ByteSentinel password.
-
-Reset your password here: {reset_url}?token={reset_token}
-
-This link expires in 15 minutes. If you didn't request this, you can
-safely ignore this email — your password won't be changed.
-
-— ByteSentinel HR
-"""
+    template = _env.get_template("password_reset_email.txt")
+    body = template.render(reset_token=reset_token, reset_url=reset_url)
     return subject, body

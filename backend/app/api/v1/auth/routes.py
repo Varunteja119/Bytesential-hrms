@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_current_user
+from app.dependencies.auth import get_current_user
 from app.core.rate_limit import limiter
 from app.config.settings import settings
 from app.database.connection.database import get_db
@@ -39,12 +39,7 @@ logger = logging.getLogger("bytesentinel.auth")
 def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     if db.query(User).filter(User.email == payload.email).first():
         raise HTTPException(status.HTTP_409_CONFLICT, "Email already registered")
-
-    user = User(
-        email=payload.email,
-        hashed_password=hash_password(payload.password),
-        full_name=payload.full_name,
-    )
+    user = User(email=payload.email, hashed_password=hash_password(payload.password), full_name=payload.full_name)
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -54,46 +49,26 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
 @router.post("/token", response_model=TokenResponse)
 @limiter.limit("5/minute")
 def token(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    """
-    OAuth2 password-grant endpoint (form-encoded: username/password), used by
-    Swagger UI's "Authorize" button and any standard OAuth2 client library.
-
-    This is functionally identical to /login — same checks, same tokens —
-    just a different request shape. Your actual frontend should use the JSON
-    /login route instead; this exists purely for OAuth2-spec compatibility.
-    Note: "username" here is the user's email.
-    """
+    """OAuth2 password-grant endpoint for Swagger's Authorize button. Real frontend should use /login instead."""
     invalid_credentials = HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid email or password")
-
     user = db.query(User).filter(User.email == form_data.username).first()
     if not user or not user.hashed_password or not verify_password(form_data.password, user.hashed_password):
         raise invalid_credentials
     if not user.is_active:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Account is deactivated")
-
-    return TokenResponse(
-        access_token=create_access_token(str(user.id)),
-        refresh_token=create_refresh_token(str(user.id)),
-    )
+    return TokenResponse(access_token=create_access_token(str(user.id)), refresh_token=create_refresh_token(str(user.id)))
 
 
 @router.post("/login", response_model=TokenResponse)
-@limiter.limit("5/minute")  # blunts brute-force/credential-stuffing on this route specifically
+@limiter.limit("5/minute")
 def login(request: Request, payload: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == payload.email).first()
-
-    # Same error for "no such user" and "wrong password" — don't leak which one it was.
     invalid_credentials = HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid email or password")
-
     if not user or not user.hashed_password or not verify_password(payload.password, user.hashed_password):
         raise invalid_credentials
     if not user.is_active:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Account is deactivated")
-
-    return TokenResponse(
-        access_token=create_access_token(str(user.id)),
-        refresh_token=create_refresh_token(str(user.id)),
-    )
+    return TokenResponse(access_token=create_access_token(str(user.id)), refresh_token=create_refresh_token(str(user.id)))
 
 
 @router.post("/refresh", response_model=TokenResponse)
@@ -104,16 +79,10 @@ def refresh(payload: RefreshRequest, db: Session = Depends(get_db)):
         user_pk = uuid.UUID(user_id)
     except (TokenError, ValueError):
         raise invalid_refresh
-
     user = db.get(User, user_pk)
     if user is None or not user.is_active:
         raise invalid_refresh
-
-    # Issue both tokens fresh (rotating the refresh token limits replay if one leaks)
-    return TokenResponse(
-        access_token=create_access_token(str(user.id)),
-        refresh_token=create_refresh_token(str(user.id)),
-    )
+    return TokenResponse(access_token=create_access_token(str(user.id)), refresh_token=create_refresh_token(str(user.id)))
 
 
 @router.get("/me", response_model=UserOut)
@@ -122,17 +91,9 @@ def me(current_user: User = Depends(get_current_user)):
 
 
 @router.post("/change-password", response_model=UserOut)
-def change_password(
-    payload: ChangePasswordRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
-):
-    """
-    Sets a new password for the logged-in user. Clears must_change_password —
-    this is how a new hire moves off their system-generated temp password
-    (see employee_provisioning.py) and completes that onboarding step.
-    """
+def change_password(payload: ChangePasswordRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     if not current_user.hashed_password or not verify_password(payload.current_password, current_user.hashed_password):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Current password is incorrect")
-
     current_user.hashed_password = hash_password(payload.new_password)
     current_user.must_change_password = False
     db.commit()
@@ -142,33 +103,16 @@ def change_password(
 
 @router.post("/password-reset/request", status_code=status.HTTP_202_ACCEPTED)
 @limiter.limit("3/minute")
-def request_password_reset(
-    request: Request,
-    payload: PasswordResetRequest,
-    db: Session = Depends(get_db),
-    email_client: EmailClient = Depends(get_email_client),
-):
-    """
-    Always returns 202 regardless of whether the email exists — a differing
-    response here would let an attacker enumerate registered accounts.
-
-    Email delivery failures are logged but never surfaced to the caller
-    (same reasoning: don't leak account existence, and don't make a flaky
-    SMTP server break an otherwise-correct API contract). The token is also
-    logged server-side as a fallback in case delivery fails, so the flow
-    stays testable even without a working SMTP server.
-    """
+def request_password_reset(request: Request, payload: PasswordResetRequest, db: Session = Depends(get_db), email_client: EmailClient = Depends(get_email_client)):
     user = db.query(User).filter(User.email == payload.email).first()
     if user is not None:
         reset_token = create_reset_token(str(user.id))
         logger.info("Password reset requested for %s. Token: %s", user.email, reset_token)
-
         subject, body = password_reset_email(reset_token, f"{settings.frontend_url}/reset-password")
         try:
             email_client.send(user.email, subject, body)
         except Exception:
             logger.error("Password reset email failed to send to %s (token still valid, logged above)", user.email)
-
     return {"message": "If that email is registered, a reset link has been sent."}
 
 
@@ -180,11 +124,9 @@ def confirm_password_reset(payload: PasswordResetConfirm, db: Session = Depends(
         user_pk = uuid.UUID(user_id)
     except (TokenError, ValueError):
         raise invalid_reset
-
     user = db.get(User, user_pk)
     if user is None:
         raise invalid_reset
-
     user.hashed_password = hash_password(payload.new_password)
     db.commit()
     return {"message": "Password updated successfully."}

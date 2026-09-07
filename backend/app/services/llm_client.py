@@ -1,18 +1,3 @@
-"""
-LLM client abstraction.
-
-Why an abstract interface instead of calling Ollama directly from
-routes/business logic: (1) it's the only way to unit-test the screening
-logic without a live Ollama instance running — tests inject a FakeLLMClient
-instead; (2) swapping models (Qwen -> DeepSeek) or providers later is a
-one-line change in get_llm_client(), not a rewrite of every call site.
-
-⚠️ OllamaClient itself is UNTESTED against a live Ollama instance in this
-environment (no local model runtime available here). The HTTP contract
-follows Ollama's documented /api/generate and /api/embeddings endpoints,
-but verify it end-to-end once Ollama is actually running with a pulled
-model — see README Known Issues.
-"""
 from typing import Protocol
 
 import httpx
@@ -27,8 +12,6 @@ class LLMClient(Protocol):
 
 
 class OllamaClient:
-    """Talks to a local Ollama server over HTTP. Falls back to MockLLMClient on failure."""
-
     def __init__(self, base_url: str, model: str, embedding_model: str, timeout: float = 60.0):
         self.base_url = base_url.rstrip("/")
         self.model = model
@@ -39,11 +22,7 @@ class OllamaClient:
         import logging
         logger = logging.getLogger("bytesentinel.llm")
         try:
-            resp = httpx.post(
-                f"{self.base_url}/api/generate",
-                json={"model": self.model, "prompt": prompt, "stream": False},
-                timeout=self.timeout,
-            )
+            resp = httpx.post(f"{self.base_url}/api/generate", json={"model": self.model, "prompt": prompt, "stream": False}, timeout=self.timeout)
             resp.raise_for_status()
             return resp.json()["response"]
         except httpx.HTTPError as exc:
@@ -54,11 +33,7 @@ class OllamaClient:
         import logging
         logger = logging.getLogger("bytesentinel.llm")
         try:
-            resp = httpx.post(
-                f"{self.base_url}/api/embeddings",
-                json={"model": self.embedding_model, "prompt": text},
-                timeout=self.timeout,
-            )
+            resp = httpx.post(f"{self.base_url}/api/embeddings", json={"model": self.embedding_model, "prompt": text}, timeout=self.timeout)
             resp.raise_for_status()
             return resp.json()["embedding"]
         except httpx.HTTPError as exc:

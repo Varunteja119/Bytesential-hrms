@@ -1,0 +1,13 @@
+Hi {{ full_name }},
+
+Welcome aboard! Your employee account has been created.
+
+  Employee ID: {{ employee_code }}
+  Temporary Password: {{ temp_password }}
+
+Please log in at {{ login_url }} and change your password before continuing —
+you won't be able to complete onboarding until you do.
+
+If you have any questions, reach out to HR.
+
+— ByteSentinel HR
