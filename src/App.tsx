@@ -10,6 +10,7 @@ import AIChat from "./pages/ai-chat/AIChat"
 import Attendance from "./pages/attendance/Attendance"
 import VerificationQueue from "./pages/hr/VerificationQueue"
 import Provision from "./pages/hr/Provision"
+import Onboarding from "./pages/onboarding/Onboarding"
 import ProtectedRoute from "./components/ProtectedRoute"
 
 function App() {
@@ -32,8 +33,8 @@ function App() {
       <Route path="/hr/verification" element={<ProtectedRoute roles={["hr_manager", "admin"]}><VerificationQueue /></ProtectedRoute>} />
       <Route path="/hr/provision" element={<ProtectedRoute roles={["hr_manager", "admin"]}><Provision /></ProtectedRoute>} />
 
-      {/* Employee only */}
-      <Route path="/onboarding" element={<ProtectedRoute><div className="p-8"><h1 className="text-2xl font-bold">Onboarding Portal — Coming Soon</h1></div></ProtectedRoute>} />
+      {/* Employee onboarding */}
+      <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
     </Routes>
   )
 }
