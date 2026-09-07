@@ -1,26 +1,160 @@
 import DashboardLayout from "@/components/layout/DashboardLayout"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import axios from "axios"
+import { apiHeaders } from "@/lib/auth"
 
-const payrollData = [
-  { id: 1, employee: "Rahul Sharma", empId: "BS-2025-001", department: "Engineering", basic: 50000, hra: 20000, special: 15000, pf: 1800, esi: 0, pt: 200, tds: 5000, lop: 0, gross: 85000, net: 78000 },
-  { id: 2, employee: "Priya Patel", empId: "BS-2025-002", department: "HR", basic: 40000, hra: 16000, special: 12000, pf: 1800, esi: 0, pt: 200, tds: 3500, lop: 0, gross: 68000, net: 62500 },
-  { id: 3, employee: "Amit Kumar", empId: "BS-2025-003", department: "Finance", basic: 35000, hra: 14000, special: 10000, pf: 1800, esi: 0, pt: 200, tds: 2500, lop: 1500, gross: 59000, net: 53000 },
-  { id: 4, employee: "Sneha Reddy", empId: "BS-2025-004", department: "Engineering", basic: 30000, hra: 12000, special: 8000, pf: 1800, esi: 375, pt: 200, tds: 1500, lop: 0, gross: 50000, net: 46125 },
-  { id: 5, employee: "Vikram Singh", empId: "BS-2025-005", department: "Sales", basic: 25000, hra: 10000, special: 7000, pf: 1800, esi: 315, pt: 200, tds: 800, lop: 3000, gross: 42000, net: 35885 },
-  { id: 6, employee: "Ananya Das", empId: "BS-2025-006", department: "Engineering", basic: 45000, hra: 18000, special: 13000, pf: 1800, esi: 0, pt: 200, tds: 4200, lop: 0, gross: 76000, net: 69800 },
-]
+const BASE = "http://localhost:8000/api/v1"
+
+interface PayrollRun {
+  id: string
+  period_year: number
+  period_month: number
+  status: string
+  hr_approved_by_id: string | null
+  finance_approved_by_id: string | null
+  paid_at: string | null
+  payslip_count: number
+}
+
+interface Payslip {
+  id: string
+  employee_id: string
+  basic: number
+  hra: number
+  other_allowances: number
+  overtime_amount: number
+  bonus_amount: number
+  gross_salary: number
+  days_in_period: number
+  days_present: number
+  days_on_leave: number
+  days_lop: number
+  pf_deduction: number
+  esi_deduction: number
+  pt_deduction: number
+  tds_amount: number
+  net_salary: number
+}
+
+const statusConfig: Record<string, { label: string, color: string }> = {
+  draft: { label: "Draft", color: "bg-yellow-100 text-yellow-700" },
+  hr_approved: { label: "HR Approved", color: "bg-blue-100 text-blue-700" },
+  finance_approved: { label: "Finance Approved", color: "bg-purple-100 text-purple-700" },
+  paid: { label: "Paid", color: "bg-green-100 text-green-700" },
+}
+
+const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 const fmt = (n: number) => `₹${n.toLocaleString("en-IN")}`
 
 export default function Payroll() {
-  const [status, setStatus] = useState<"draft" | "approved">("draft")
-  const [month] = useState("June 2025")
+  const [runs, setRuns] = useState<PayrollRun[]>([])
+  const [selectedRun, setSelectedRun] = useState<PayrollRun | null>(null)
+  const [payslips, setPayslips] = useState<Payslip[]>([])
+  const [loading, setLoading] = useState(true)
+  const [payslipsLoading, setPayslipsLoading] = useState(false)
 
-  const totalGross = payrollData.reduce((a, b) => a + b.gross, 0)
-  const totalNet = payrollData.reduce((a, b) => a + b.net, 0)
-  const totalPF = payrollData.reduce((a, b) => a + b.pf, 0)
-  const totalTDS = payrollData.reduce((a, b) => a + b.tds, 0)
+  // Create run form
+  const [showCreate, setShowCreate] = useState(false)
+  const [createForm, setCreateForm] = useState({
+    period_year: new Date().getFullYear(),
+    period_month: new Date().getMonth() + 1
+  })
+  const [createLoading, setCreateLoading] = useState(false)
+  const [createError, setCreateError] = useState("")
+
+  useEffect(() => {
+    fetchRuns()
+  }, [])
+
+  async function fetchRuns() {
+    try {
+      const res = await axios.get(`${BASE}/payroll/runs`, { headers: apiHeaders() })
+      setRuns(res.data)
+    } catch (err) {
+      console.error("Failed to fetch payroll runs", err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function fetchPayslips(runId: string) {
+    setPayslipsLoading(true)
+    try {
+      const res = await axios.get(`${BASE}/payroll/runs/${runId}/payslips`, { headers: apiHeaders() })
+      setPayslips(res.data)
+    } catch (err) {
+      console.error("Failed to fetch payslips", err)
+    } finally {
+      setPayslipsLoading(false)
+    }
+  }
+
+  async function createRun() {
+    setCreateLoading(true)
+    setCreateError("")
+    try {
+      await axios.post(`${BASE}/payroll/runs`, createForm, { headers: apiHeaders() })
+      setShowCreate(false)
+      fetchRuns()
+    } catch (err: any) {
+      setCreateError(err.response?.data?.error?.message || "Failed to create payroll run")
+    } finally {
+      setCreateLoading(false)
+    }
+  }
+
+  async function approveHR(runId: string) {
+    try {
+      await axios.post(`${BASE}/payroll/runs/${runId}/approve-hr`, {}, { headers: apiHeaders() })
+      fetchRuns()
+      if (selectedRun?.id === runId) {
+        const res = await axios.get(`${BASE}/payroll/runs/${runId}`, { headers: apiHeaders() })
+        setSelectedRun(res.data)
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.error?.message || "Failed to approve")
+    }
+  }
+
+  async function approveFinance(runId: string) {
+    try {
+      await axios.post(`${BASE}/payroll/runs/${runId}/approve-finance`, {}, { headers: apiHeaders() })
+      fetchRuns()
+      if (selectedRun?.id === runId) {
+        const res = await axios.get(`${BASE}/payroll/runs/${runId}`, { headers: apiHeaders() })
+        setSelectedRun(res.data)
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.error?.message || "Failed to approve")
+    }
+  }
+
+  async function markPaid(runId: string) {
+    try {
+      await axios.post(`${BASE}/payroll/runs/${runId}/mark-paid`, {}, { headers: apiHeaders() })
+      fetchRuns()
+      if (selectedRun?.id === runId) {
+        const res = await axios.get(`${BASE}/payroll/runs/${runId}`, { headers: apiHeaders() })
+        setSelectedRun(res.data)
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.error?.message || "Failed to mark paid")
+    }
+  }
+
+  function openRun(run: PayrollRun) {
+    setSelectedRun(run)
+    fetchPayslips(run.id)
+  }
+
+  const totalGross = payslips.reduce((a, b) => a + b.gross_salary, 0)
+  const totalNet = payslips.reduce((a, b) => a + b.net_salary, 0)
+  const totalPF = payslips.reduce((a, b) => a + b.pf_deduction, 0)
+  const totalTDS = payslips.reduce((a, b) => a + b.tds_amount, 0)
 
   return (
     <DashboardLayout>
@@ -30,134 +164,183 @@ export default function Payroll() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Payroll</h1>
-            <p className="text-gray-500 text-sm mt-1">{month} — {payrollData.length} employees</p>
+            <p className="text-gray-500 text-sm mt-1">{runs.length} payroll runs</p>
           </div>
-          <div className="flex gap-3">
-            {status === "draft" && (
-              <Button
-                onClick={() => setStatus("approved")}
-                className="bg-green-600 hover:bg-green-700 text-white"
-              >
-                ✓ Approve Payroll Run
+          <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => setShowCreate(!showCreate)}>
+            + Create Payroll Run
+          </Button>
+        </div>
+
+        {/* Create Run Form */}
+        {showCreate && (
+          <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+            <h2 className="font-semibold text-gray-800">Create New Payroll Run</h2>
+            {createError && <div className="bg-red-50 text-red-600 text-sm p-3 rounded-md">{createError}</div>}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Year</Label>
+                <Input
+                  type="number"
+                  value={createForm.period_year}
+                  onChange={e => setCreateForm({...createForm, period_year: parseInt(e.target.value)})}
+                  min={2020} max={2100}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Month</Label>
+                <select
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                  value={createForm.period_month}
+                  onChange={e => setCreateForm({...createForm, period_month: parseInt(e.target.value)})}
+                >
+                  {months.map((m, i) => (
+                    <option key={m} value={i + 1}>{m}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <Button onClick={createRun} disabled={createLoading} className="bg-blue-600 text-white">
+                {createLoading ? "Creating..." : "Create Run"}
               </Button>
-            )}
-            {status === "approved" && (
-              <div className="flex items-center gap-2">
-                <span className="bg-green-100 text-green-700 px-3 py-2 rounded-lg text-sm font-medium">
-                  ✓ Payroll Approved
-                </span>
-                <Button className="bg-blue-600 hover:bg-blue-700 text-white">
-                  📧 Send Payslips
-                </Button>
+              <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-3 gap-6">
+
+          {/* Payroll Runs List */}
+          <div className="col-span-1 bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
+              <h2 className="text-sm font-semibold text-gray-700">Payroll Runs</h2>
+            </div>
+            {loading ? (
+              <div className="p-6 text-center text-gray-400 text-sm">Loading...</div>
+            ) : runs.length === 0 ? (
+              <div className="p-6 text-center text-gray-400 text-sm">No payroll runs yet</div>
+            ) : (
+              <div className="divide-y divide-gray-50">
+                {runs.map(run => {
+                  const conf = statusConfig[run.status]
+                  return (
+                    <button
+                      key={run.id}
+                      onClick={() => openRun(run)}
+                      className={`w-full text-left p-4 hover:bg-gray-50 transition-colors ${selectedRun?.id === run.id ? "bg-blue-50 border-l-4 border-blue-600" : ""}`}
+                    >
+                      <p className="text-sm font-medium text-gray-900">
+                        {months[run.period_month - 1]} {run.period_year}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-0.5">{run.payslip_count} payslips</p>
+                      <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${conf.color}`}>
+                        {conf.label}
+                      </span>
+                    </button>
+                  )
+                })}
               </div>
             )}
           </div>
-        </div>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-4 gap-4">
-          {[
-            { label: "Total Gross", value: fmt(totalGross), color: "bg-blue-500" },
-            { label: "Total Net Pay", value: fmt(totalNet), color: "bg-green-500" },
-            { label: "Total PF", value: fmt(totalPF), color: "bg-purple-500" },
-            { label: "Total TDS", value: fmt(totalTDS), color: "bg-orange-500" },
-          ].map((s) => (
-            <div key={s.label} className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-              <div className={`w-8 h-8 ${s.color} rounded-lg mb-3`} />
-              <p className="text-xl font-bold text-gray-900">{s.value}</p>
-              <p className="text-sm text-gray-500 mt-1">{s.label}</p>
-            </div>
-          ))}
-        </div>
+          {/* Payroll Run Detail */}
+          <div className="col-span-2 space-y-4">
+            {!selectedRun ? (
+              <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-12 text-center text-gray-400">
+                Select a payroll run to view details
+              </div>
+            ) : (
+              <>
+                {/* Run Status + Actions */}
+                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h2 className="font-semibold text-gray-800">
+                        {months[selectedRun.period_month - 1]} {selectedRun.period_year}
+                      </h2>
+                      <span className={`inline-block mt-1 px-2 py-1 rounded-full text-xs font-medium ${statusConfig[selectedRun.status].color}`}>
+                        {statusConfig[selectedRun.status].label}
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      {selectedRun.status === "draft" && (
+                        <Button onClick={() => approveHR(selectedRun.id)} className="bg-blue-600 hover:bg-blue-700 text-white text-sm">
+                          HR Approve
+                        </Button>
+                      )}
+                      {selectedRun.status === "hr_approved" && (
+                        <Button onClick={() => approveFinance(selectedRun.id)} className="bg-purple-600 hover:bg-purple-700 text-white text-sm">
+                          Finance Approve
+                        </Button>
+                      )}
+                      {selectedRun.status === "finance_approved" && (
+                        <Button onClick={() => markPaid(selectedRun.id)} className="bg-green-600 hover:bg-green-700 text-white text-sm">
+                          Mark as Paid
+                        </Button>
+                      )}
+                    </div>
+                  </div>
 
-        {/* Status Banner */}
-        <div className={`rounded-xl p-4 flex items-center justify-between ${
-          status === "draft" ? "bg-yellow-50 border border-yellow-200" : "bg-green-50 border border-green-200"
-        }`}>
-          <div className="flex items-center gap-3">
-            <span className="text-lg">{status === "draft" ? "⏳" : "✅"}</span>
-            <div>
-              <p className="font-medium text-gray-800">
-                {status === "draft" ? "Payroll Draft — Pending Approval" : "Payroll Approved — Ready to Dispatch"}
-              </p>
-              <p className="text-sm text-gray-500">
-                {status === "draft"
-                  ? "Review all entries and click Approve to process payroll"
-                  : "Click Send Payslips to email payslips to all employees"}
-              </p>
-            </div>
-          </div>
-          <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-            status === "draft" ? "bg-yellow-100 text-yellow-700" : "bg-green-100 text-green-700"
-          }`}>
-            {status === "draft" ? "DRAFT" : "APPROVED"}
-          </span>
-        </div>
-
-        {/* Payroll Table */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-100">
-                  <th className="text-left px-4 py-4 text-xs font-semibold text-gray-500 uppercase">Employee</th>
-                  <th className="text-right px-4 py-4 text-xs font-semibold text-gray-500 uppercase">Basic</th>
-                  <th className="text-right px-4 py-4 text-xs font-semibold text-gray-500 uppercase">HRA</th>
-                  <th className="text-right px-4 py-4 text-xs font-semibold text-gray-500 uppercase">Special</th>
-                  <th className="text-right px-4 py-4 text-xs font-semibold text-gray-500 uppercase">Gross</th>
-                  <th className="text-right px-4 py-4 text-xs font-semibold text-gray-500 uppercase">PF</th>
-                  <th className="text-right px-4 py-4 text-xs font-semibold text-gray-500 uppercase">TDS</th>
-                  <th className="text-right px-4 py-4 text-xs font-semibold text-gray-500 uppercase">LOP</th>
-                  <th className="text-right px-4 py-4 text-xs font-semibold text-gray-500 uppercase">Net Pay</th>
-                  <th className="text-left px-4 py-4 text-xs font-semibold text-gray-500 uppercase">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {payrollData.map((emp) => (
-                  <tr key={emp.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold">
-                          {emp.employee.charAt(0)}
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">{emp.employee}</p>
-                          <p className="text-xs text-gray-400">{emp.empId} · {emp.department}</p>
-                        </div>
+                  {/* Summary */}
+                  <div className="grid grid-cols-4 gap-4">
+                    {[
+                      { label: "Total Gross", value: fmt(totalGross) },
+                      { label: "Total Net", value: fmt(totalNet) },
+                      { label: "Total PF", value: fmt(totalPF) },
+                      { label: "Total TDS", value: fmt(totalTDS) },
+                    ].map(s => (
+                      <div key={s.label} className="bg-gray-50 rounded-lg p-3">
+                        <p className="text-xs text-gray-400">{s.label}</p>
+                        <p className="text-sm font-bold text-gray-800 mt-1">{s.value}</p>
                       </div>
-                    </td>
-                    <td className="px-4 py-4 text-sm text-right text-gray-600">{fmt(emp.basic)}</td>
-                    <td className="px-4 py-4 text-sm text-right text-gray-600">{fmt(emp.hra)}</td>
-                    <td className="px-4 py-4 text-sm text-right text-gray-600">{fmt(emp.special)}</td>
-                    <td className="px-4 py-4 text-sm text-right font-medium text-gray-800">{fmt(emp.gross)}</td>
-                    <td className="px-4 py-4 text-sm text-right text-red-500">-{fmt(emp.pf)}</td>
-                    <td className="px-4 py-4 text-sm text-right text-red-500">-{fmt(emp.tds)}</td>
-                    <td className="px-4 py-4 text-sm text-right text-red-500">
-                      {emp.lop > 0 ? `-${fmt(emp.lop)}` : "—"}
-                    </td>
-                    <td className="px-4 py-4 text-sm text-right font-bold text-green-600">{fmt(emp.net)}</td>
-                    <td className="px-4 py-4">
-                      <button className="text-xs text-blue-600 hover:underline">Payslip</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="bg-gray-50 border-t-2 border-gray-200">
-                  <td className="px-4 py-4 text-sm font-bold text-gray-800">Total</td>
-                  <td colSpan={3} />
-                  <td className="px-4 py-4 text-sm font-bold text-right text-gray-800">{fmt(totalGross)}</td>
-                  <td className="px-4 py-4 text-sm font-bold text-right text-red-500">-{fmt(totalPF)}</td>
-                  <td className="px-4 py-4 text-sm font-bold text-right text-red-500">-{fmt(totalTDS)}</td>
-                  <td />
-                  <td className="px-4 py-4 text-sm font-bold text-right text-green-600">{fmt(totalNet)}</td>
-                  <td />
-                </tr>
-              </tfoot>
-            </table>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Payslips Table */}
+                <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                  <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
+                    <h2 className="text-sm font-semibold text-gray-700">Payslips ({payslips.length})</h2>
+                  </div>
+                  {payslipsLoading ? (
+                    <div className="p-6 text-center text-gray-400">Loading payslips...</div>
+                  ) : payslips.length === 0 ? (
+                    <div className="p-6 text-center text-gray-400 text-sm">No payslips in this run</div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="bg-gray-50 border-b border-gray-100">
+                            <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Basic</th>
+                            <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">HRA</th>
+                            <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Gross</th>
+                            <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">PF</th>
+                            <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">TDS</th>
+                            <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">LOP Days</th>
+                            <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Net Pay</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                          {payslips.map(p => (
+                            <tr key={p.id} className="hover:bg-gray-50">
+                              <td className="px-4 py-3 text-sm text-right text-gray-600">{fmt(p.basic)}</td>
+                              <td className="px-4 py-3 text-sm text-right text-gray-600">{fmt(p.hra)}</td>
+                              <td className="px-4 py-3 text-sm text-right font-medium text-gray-800">{fmt(p.gross_salary)}</td>
+                              <td className="px-4 py-3 text-sm text-right text-red-500">-{fmt(p.pf_deduction)}</td>
+                              <td className="px-4 py-3 text-sm text-right text-red-500">-{fmt(p.tds_amount)}</td>
+                              <td className="px-4 py-3 text-sm text-right text-gray-600">{p.days_lop}</td>
+                              <td className="px-4 py-3 text-sm text-right font-bold text-green-600">{fmt(p.net_salary)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </div>
-
       </div>
     </DashboardLayout>
   )
