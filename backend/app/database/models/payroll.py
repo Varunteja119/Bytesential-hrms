@@ -1,20 +1,3 @@
-"""
-Payroll schema.
-
-⚠️ IMPORTANT — statutory calculations: PF/ESI/PT rates below are stored as
-DATA in PayrollConfig, not hardcoded in application code. This is deliberate:
-these rates change on a schedule the company doesn't control (government
-wage-ceiling revisions, PT slab changes), so they need to be updatable by
-an authorized user through the API — not require a developer + redeploy
-every time. The seeded default values are PLACEHOLDERS pending real numbers
-from HR/Finance/legal — see app/database/seed/seed_payroll_config.py.
-
-TDS is deliberately NOT auto-calculated anywhere in this module — it's a
-manually-entered amount per payslip. Auto-computing Indian income tax
-(regime choice, slabs, employee declarations/exemptions) without a real
-tax engine or compliance sign-off would be actively misleading, not just
-an approximation.
-"""
 import enum
 from datetime import date as date_type, datetime
 
@@ -34,32 +17,19 @@ class PayrollRunStatus(str, enum.Enum):
 
 
 class PayrollConfig(Base, UUIDPrimaryKeyMixin, TimestampMixin):
-    """
-    Single active row holding current statutory rates. Historical configs
-    aren't versioned yet (a real system might want that for recalculating
-    old payroll runs correctly) — noted as a known simplification, not an
-    oversight, since no payroll run has been processed yet to need it.
-    """
     __tablename__ = "payroll_config"
-
     pf_rate_percent: Mapped[float] = mapped_column(Float, nullable=False)
-    pf_wage_ceiling: Mapped[float] = mapped_column(Float, nullable=False)  # PF calculated on min(basic, ceiling)
+    pf_wage_ceiling: Mapped[float] = mapped_column(Float, nullable=False)
     esi_rate_percent: Mapped[float] = mapped_column(Float, nullable=False)
-    esi_wage_threshold: Mapped[float] = mapped_column(Float, nullable=False)  # ESI only applies below this gross
+    esi_wage_threshold: Mapped[float] = mapped_column(Float, nullable=False)
     pt_state: Mapped[str] = mapped_column(String(100), nullable=False)
-    pt_amount: Mapped[float] = mapped_column(Float, nullable=False)  # flat monthly PT — real slabs are more complex, see note above
+    pt_amount: Mapped[float] = mapped_column(Float, nullable=False)
     overtime_rate_multiplier: Mapped[float] = mapped_column(Float, nullable=False, default=1.5)
     updated_by_id: Mapped[UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
 
 
 class SalaryStructure(Base, UUIDPrimaryKeyMixin, TimestampMixin):
-    """
-    One row per salary revision (per SRS's 'Salary Revision' workflow step) —
-    NOT one row per employee. The "current" structure for a given payroll
-    month is the row with the latest effective_from <= that month's period.
-    """
     __tablename__ = "salary_structures"
-
     employee_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("employees.id", ondelete="CASCADE"), nullable=False)
     basic: Mapped[float] = mapped_column(Float, nullable=False)
     hra: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
@@ -70,31 +40,25 @@ class SalaryStructure(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 class PayrollRun(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "payroll_runs"
     __table_args__ = (UniqueConstraint("period_year", "period_month", name="uq_payroll_run_period"),)
-
     period_year: Mapped[int] = mapped_column(Integer, nullable=False)
-    period_month: Mapped[int] = mapped_column(Integer, nullable=False)  # 1-12
+    period_month: Mapped[int] = mapped_column(Integer, nullable=False)
     status: Mapped[PayrollRunStatus] = mapped_column(Enum(PayrollRunStatus), default=PayrollRunStatus.DRAFT, nullable=False)
-
     created_by_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     hr_approved_by_id: Mapped[UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
     hr_approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finance_approved_by_id: Mapped[UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
     finance_approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-
     payslips: Mapped[list["Payslip"]] = relationship(back_populates="payroll_run", cascade="all, delete-orphan")
 
 
 class Payslip(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "payslips"
     __table_args__ = (UniqueConstraint("payroll_run_id", "employee_id", name="uq_payslip_run_employee"),)
-
     payroll_run_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("payroll_runs.id", ondelete="CASCADE"), nullable=False)
     payroll_run: Mapped["PayrollRun"] = relationship(back_populates="payslips")
-
     employee_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("employees.id"), nullable=False)
 
-    # Earnings
     basic: Mapped[float] = mapped_column(Float, nullable=False)
     hra: Mapped[float] = mapped_column(Float, nullable=False)
     other_allowances: Mapped[float] = mapped_column(Float, nullable=False)
@@ -102,18 +66,15 @@ class Payslip(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     bonus_amount: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     gross_salary: Mapped[float] = mapped_column(Float, nullable=False)
 
-    # Attendance-driven proration
     days_in_period: Mapped[int] = mapped_column(Integer, nullable=False)
     days_present: Mapped[int] = mapped_column(Integer, nullable=False)
     days_on_leave: Mapped[int] = mapped_column(Integer, nullable=False)
-    days_lop: Mapped[int] = mapped_column(Integer, nullable=False)  # Loss of Pay — unmarked/absent days
+    days_lop: Mapped[int] = mapped_column(Integer, nullable=False)
 
-    # Deductions
     pf_deduction: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     esi_deduction: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     pt_deduction: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
-    tds_amount: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)  # manually entered — see module docstring
+    tds_amount: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
 
     net_salary: Mapped[float] = mapped_column(Float, nullable=False)
-
-    pdf_storage_key: Mapped[str | None] = mapped_column(String(500))  # set once payslip PDF is generated
+    pdf_storage_key: Mapped[str | None] = mapped_column(String(500))

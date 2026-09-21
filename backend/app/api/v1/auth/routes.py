@@ -5,28 +5,15 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
-from app.dependencies.auth import get_current_user
-from app.core.rate_limit import limiter
 from app.config.settings import settings
 from app.database.connection.database import get_db
 from app.database.models.user import User
-from app.database.schemas.auth import (
-    ChangePasswordRequest,
-    LoginRequest,
-    PasswordResetConfirm,
-    PasswordResetRequest,
-    RefreshRequest,
-    RegisterRequest,
-    TokenResponse,
-)
+from app.database.schemas.auth import (ChangePasswordRequest, LoginRequest, PasswordResetConfirm, PasswordResetRequest,
+                                        RefreshRequest, RegisterRequest, TokenResponse)
 from app.database.schemas.user import UserOut
-from app.security.jwt import (
-    TokenError,
-    create_access_token,
-    create_refresh_token,
-    create_reset_token,
-    decode_token,
-)
+from app.dependencies.auth import get_current_user
+from app.core.rate_limit import limiter
+from app.security.jwt import TokenError, create_access_token, create_refresh_token, create_reset_token, decode_token
 from app.security.password import hash_password, verify_password
 from app.services.email_client import EmailClient, get_email_client
 from app.services.email_templates import password_reset_email
@@ -49,7 +36,6 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
 @router.post("/token", response_model=TokenResponse)
 @limiter.limit("5/minute")
 def token(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    """OAuth2 password-grant endpoint for Swagger's Authorize button. Real frontend should use /login instead."""
     invalid_credentials = HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid email or password")
     user = db.query(User).filter(User.email == form_data.username).first()
     if not user or not user.hashed_password or not verify_password(form_data.password, user.hashed_password):
@@ -112,7 +98,7 @@ def request_password_reset(request: Request, payload: PasswordResetRequest, db: 
         try:
             email_client.send(user.email, subject, body)
         except Exception:
-            logger.error("Password reset email failed to send to %s (token still valid, logged above)", user.email)
+            logger.error("Password reset email failed to send to %s", user.email)
     return {"message": "If that email is registered, a reset link has been sent."}
 
 

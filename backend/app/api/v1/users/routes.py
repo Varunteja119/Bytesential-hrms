@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-
 from app.dependencies.auth import require_permission
 from app.database.connection.database import get_db
 from app.database.models.user import User

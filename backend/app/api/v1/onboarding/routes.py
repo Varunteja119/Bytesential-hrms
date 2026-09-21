@@ -1,5 +1,4 @@
 import uuid
-
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
@@ -9,7 +8,6 @@ from app.database.connection.database import get_db
 from app.database.models.user import User
 from app.dependencies.auth import get_current_user
 
-# Deliberately kept at the /employees prefix -- see documents/routes.py for why.
 router = APIRouter(prefix="/employees", tags=["onboarding"])
 
 

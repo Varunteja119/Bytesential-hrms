@@ -2,23 +2,37 @@ from typing import TypedDict
 from app.core.exceptions import AppError
 from app.database.models.employee import DocumentType, Employee, EmploymentStatus
 
-REQUIRED_DOCUMENT_TYPES = {DocumentType.AADHAAR, DocumentType.PAN, DocumentType.BANK_PROOF}
+REQUIRED_DOCUMENT_TYPES: set[DocumentType] = {DocumentType.AADHAAR, DocumentType.PAN, DocumentType.BANK_PROOF}
 
 
-def compute_onboarding_status(employee: Employee) -> dict:
+class DocumentChecklistItem(TypedDict):
+    document_type: str
+    uploaded: bool
+    verified: bool
+
+
+class OnboardingStatus(TypedDict):
+    credentials_generated: bool
+    password_changed: bool
+    profile_completed: bool
+    documents: list[DocumentChecklistItem]
+    hr_verified: bool
+    employment_status: str
+    ready_for_activation: bool
+
+
+def compute_onboarding_status(employee: Employee) -> OnboardingStatus:
     uploaded_by_type = {d.document_type: d for d in employee.documents}
     documents = [
-        {"document_type": t.value, "uploaded": t in uploaded_by_type,
-         "verified": uploaded_by_type[t].verified if t in uploaded_by_type else False}
+        {"document_type": t.value, "uploaded": t in uploaded_by_type, "verified": uploaded_by_type[t].verified if t in uploaded_by_type else False}
         for t in sorted(REQUIRED_DOCUMENT_TYPES, key=lambda t: t.value)
     ]
     password_changed = not employee.user.must_change_password
-    all_verified = all(d["verified"] for d in documents)
+    all_required_docs_verified = all(d["verified"] for d in documents)
     return {
-        "credentials_generated": True, "password_changed": password_changed,
-        "profile_completed": employee.profile_completed, "documents": documents,
-        "hr_verified": employee.hr_verified, "employment_status": employee.employment_status.value,
-        "ready_for_activation": password_changed and employee.profile_completed and all_verified,
+        "credentials_generated": True, "password_changed": password_changed, "profile_completed": employee.profile_completed,
+        "documents": documents, "hr_verified": employee.hr_verified, "employment_status": employee.employment_status.value,
+        "ready_for_activation": password_changed and employee.profile_completed and all_required_docs_verified,
     }
 
 

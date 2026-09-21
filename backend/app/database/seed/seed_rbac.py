@@ -23,17 +23,29 @@ DEFAULT_PERMISSIONS = [
     ("recruitment:manage", "Manage recruitment pipeline"),
     ("attendance:read", "View attendance records"),
     ("attendance:write", "Create/correct attendance records"),
+    ("performance:read", "View performance cycles and reviews"),
+    ("performance:manage", "Create cycles, generate reviews, generate AI recommendations, HR-approve"),
+    ("performance:review", "Submit manager reviews"),
+    ("performance:approve_management", "Final management approval step for a performance review"),
+    ("ai_assistant:manage", "Upload/manage policy documents for the AI assistant"),
+    ("analytics:read", "View aggregate analytics (headcount, attendance, leave, payroll trends)"),
+    ("analytics:attrition_risk", "Request individual attrition risk assessments"),
+    ("employee:exit", "Record an employee exit"),
 ]
 
 DEFAULT_ROLES = {
     "admin": [code for code, _ in DEFAULT_PERMISSIONS],
-    "hr_manager": ["user:read", "employee:read", "employee:write", "leave:read", "leave:approve", "recruitment:manage", "attendance:read", "attendance:write", "payroll:read", "payroll:manage", "payroll:approve_hr"],
+    "hr_manager": ["user:read", "employee:read", "employee:write", "employee:exit", "leave:read", "leave:approve", "recruitment:manage",
+                   "attendance:read", "attendance:write", "payroll:read", "payroll:manage", "payroll:approve_hr",
+                   "performance:read", "performance:manage", "performance:review", "ai_assistant:manage",
+                   "analytics:read", "analytics:attrition_risk"],
     "finance_manager": ["payroll:read", "payroll:approve_finance"],
+    "management": ["performance:read", "performance:approve_management"],
     "employee": ["employee:read"],
 }
 
 
-def seed_permissions(db) -> dict[str, Permission]:
+def seed_permissions(db):
     existing = {p.code: p for p in db.query(Permission).all()}
     for code, description in DEFAULT_PERMISSIONS:
         if code not in existing:
@@ -44,7 +56,7 @@ def seed_permissions(db) -> dict[str, Permission]:
     return {p.code: p for p in db.query(Permission).all()}
 
 
-def seed_roles(db, permissions: dict[str, Permission]) -> dict[str, Role]:
+def seed_roles(db, permissions):
     existing = {r.name: r for r in db.query(Role).all()}
     for role_name, perm_codes in DEFAULT_ROLES.items():
         role = existing.get(role_name)
@@ -57,15 +69,13 @@ def seed_roles(db, permissions: dict[str, Permission]) -> dict[str, Role]:
     return existing
 
 
-def seed_superuser(db, roles: dict[str, Role]) -> None:
+def seed_superuser(db, roles):
     email = os.getenv("SEED_SUPERUSER_EMAIL", "admin@bytesentinel.com")
     password = os.getenv("SEED_SUPERUSER_PASSWORD", "ChangeMe123!")
-
     user = db.query(User).filter(User.email == email).first()
     if user is not None:
         print(f"Superuser {email} already exists — skipping.")
         return
-
     user = User(email=email, hashed_password=hash_password(password), full_name="ByteSentinel Admin", is_superuser=True)
     user.roles = [roles["admin"]]
     db.add(user)

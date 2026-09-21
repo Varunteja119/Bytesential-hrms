@@ -11,37 +11,26 @@ from app.api.v1.employees.routes import router as employees_router
 from app.api.v1.leave.routes import router as leave_router
 from app.api.v1.onboarding.routes import router as onboarding_router
 from app.api.v1.payroll.routes import router as payroll_router
+from app.api.v1.performance.routes import router as performance_router
+from app.api.v1.ai_assistant.routes import router as ai_assistant_router
+from app.api.v1.analytics.routes import router as analytics_router
 from app.api.v1.recruitment.routes import router as recruitment_router
 from app.api.v1.users.routes import router as users_router
 from app.config.settings import settings
 from app.core.exceptions import register_exception_handlers
-from app.middleware.logging_middleware import RequestLoggingMiddleware
 from app.logging.config import configure_logging
+from app.middleware.logging_middleware import RequestLoggingMiddleware
 from app.core.rate_limit import limiter
 
 configure_logging(settings.debug)
 
-app = FastAPI(
-    title=settings.app_name,
-    version="0.1.0",
-    docs_url="/api/docs",
-    redoc_url="/api/redoc",
-    openapi_url="/api/openapi.json",
-)
+app = FastAPI(title=settings.app_name, version="0.1.0", docs_url="/api/docs", redoc_url="/api/redoc", openapi_url="/api/openapi.json")
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 register_exception_handlers(app)
-
 app.add_middleware(RequestLoggingMiddleware)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"] if settings.debug else [],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app.add_middleware(CORSMiddleware, allow_origins=["*"] if settings.debug else [], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 app.include_router(auth_router, prefix=settings.api_v1_prefix)
 app.include_router(oauth_router, prefix=settings.api_v1_prefix)
@@ -50,9 +39,12 @@ app.include_router(recruitment_router, prefix=settings.api_v1_prefix)
 app.include_router(employees_router, prefix=settings.api_v1_prefix)
 app.include_router(documents_router, prefix=settings.api_v1_prefix)
 app.include_router(onboarding_router, prefix=settings.api_v1_prefix)
-app.include_router(payroll_router, prefix=settings.api_v1_prefix)
 app.include_router(attendance_router, prefix=settings.api_v1_prefix)
 app.include_router(leave_router, prefix=settings.api_v1_prefix)
+app.include_router(payroll_router, prefix=settings.api_v1_prefix)
+app.include_router(performance_router, prefix=settings.api_v1_prefix)
+app.include_router(ai_assistant_router, prefix=settings.api_v1_prefix)
+app.include_router(analytics_router, prefix=settings.api_v1_prefix)
 
 
 @app.get("/api/v1/health", tags=["health"])

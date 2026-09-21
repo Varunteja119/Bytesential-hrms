@@ -2,7 +2,6 @@ import logging
 import smtplib
 from email.mime.text import MIMEText
 from typing import Protocol
-
 from app.config.settings import settings
 
 logger = logging.getLogger("bytesentinel.email")
@@ -39,11 +38,5 @@ class SMTPEmailClient:
 
 
 def get_email_client() -> EmailClient:
-    return SMTPEmailClient(
-        host=settings.smtp_host,
-        port=settings.smtp_port,
-        username=settings.smtp_username,
-        password=settings.smtp_password,
-        from_email=settings.smtp_from_email,
-        use_tls=settings.smtp_use_tls,
-    )
+    return SMTPEmailClient(host=settings.smtp_host, port=settings.smtp_port, username=settings.smtp_username,
+                            password=settings.smtp_password, from_email=settings.smtp_from_email, use_tls=settings.smtp_use_tls)

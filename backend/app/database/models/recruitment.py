@@ -2,6 +2,7 @@ import enum
 from sqlalchemy import Enum, Float, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from app.database.connection.database import Base
 from app.database.models.mixins import TimestampMixin, UUIDPrimaryKeyMixin
 

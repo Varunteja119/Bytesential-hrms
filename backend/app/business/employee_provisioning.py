@@ -2,8 +2,10 @@ import logging
 import secrets
 import string
 from datetime import date
+
 from sqlalchemy import func
 from sqlalchemy.orm import Session
+
 from app.config.settings import settings
 from app.core.exceptions import AppError
 from app.database.models.employee import Employee, EmploymentStatus
@@ -28,22 +30,17 @@ def generate_temp_password() -> str:
     return "".join(secrets.choice(alphabet) for _ in range(12))
 
 
-def provision_employee_from_candidate(
-    db: Session, candidate: Candidate, department: str, designation: str, date_of_joining: date, email_client: EmailClient
-):
-    """
-    Returns (employee, temp_password). The temp password is emailed to the
-    candidate AND still returned in the API response — the response stays as
-    a fallback in case email delivery fails, since there's no retry/dead-letter
-    mechanism for failed sends yet.
-    """
+def provision_employee_from_candidate(db: Session, candidate: Candidate, department: str, designation: str, date_of_joining: date, email_client: EmailClient):
     if candidate.status != CandidateStatus.ACCEPTED:
         raise AppError(f"Candidate must be in 'accepted' status to provision as an employee (currently '{candidate.status.value}').")
+
     existing = db.query(Employee).filter(Employee.candidate_id == candidate.id).first()
     if existing is not None:
         raise AppError(f"Candidate has already been provisioned as employee {existing.employee_code}.")
+
     if db.query(User).filter(User.email == candidate.email).first() is not None:
         raise AppError(f"A user account already exists for {candidate.email}.")
+
     employee_role = db.query(Role).filter(Role.name == _EMPLOYEE_ROLE_NAME).first()
     if employee_role is None:
         raise AppError(f"Default '{_EMPLOYEE_ROLE_NAME}' role not found — run the seed script first.", status_code=500)
@@ -65,9 +62,6 @@ def provision_employee_from_candidate(
     try:
         email_client.send(candidate.email, subject, body)
     except Exception:
-        # Don't let a down SMTP server fail the whole provisioning transaction —
-        # the employee record is already committed; HR can relay the temp
-        # password manually (it's still in this function's return value).
         logger.error("Welcome email failed to send to %s — temp password must be relayed manually.", candidate.email)
 
     return employee, temp_password

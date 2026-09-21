@@ -11,13 +11,9 @@ from app.security.jwt import create_access_token, create_refresh_token
 router = APIRouter(prefix="/auth/oauth", tags=["auth"])
 
 oauth = OAuth()
-oauth.register(
-    name="google",
-    client_id=settings.google_client_id,
-    client_secret=settings.google_client_secret,
-    server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
-    client_kwargs={"scope": "openid email profile"},
-)
+oauth.register(name="google", client_id=settings.google_client_id, client_secret=settings.google_client_secret,
+                server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+                client_kwargs={"scope": "openid email profile"})
 
 
 @router.get("/google/login")
@@ -32,7 +28,6 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
         userinfo = token["userinfo"]
     except Exception:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Google authentication failed")
-
     email = userinfo["email"]
     user = db.query(User).filter(User.email == email).first()
     if user is None:
@@ -40,5 +35,4 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
         db.add(user)
         db.commit()
         db.refresh(user)
-
     return TokenResponse(access_token=create_access_token(str(user.id)), refresh_token=create_refresh_token(str(user.id)))

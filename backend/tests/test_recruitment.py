@@ -15,8 +15,7 @@ def _make_recruiter(db_session) -> None:
 
 def _auth_headers(client) -> dict:
     resp = client.post("/api/v1/auth/login", json={"email": "recruiter@example.com", "password": "supersecret1"})
-    token = resp.json()["access_token"]
-    return {"Authorization": f"Bearer {token}"}
+    return {"Authorization": f"Bearer {resp.json()['access_token']}"}
 
 
 def _create_job(client, headers) -> str:

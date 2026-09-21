@@ -9,15 +9,13 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-import app.database.models  # noqa: F401 -- registers all models before Base.metadata.create_all()
+import app.database.models  # noqa: F401
 from app.database.connection.database import Base, get_db
-from app.main import app  # must be imported last: this binds `app` to the FastAPI instance
+from app.main import app
 from app.services.email_client import get_email_client
 
 
 class FakeEmailClient:
-    """Captures sent emails in memory instead of hitting real SMTP."""
-
     def __init__(self):
         self.sent: list[dict] = []
 
@@ -27,14 +25,9 @@ class FakeEmailClient:
 
 @pytest.fixture()
 def db_session():
-    engine = create_engine(
-        "sqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
+    engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False}, poolclass=StaticPool)
     TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     Base.metadata.create_all(bind=engine)
-
     session = TestingSessionLocal()
     try:
         yield session
@@ -50,7 +43,6 @@ def fake_email_client():
 @pytest.fixture()
 def client(db_session, fake_email_client):
     from app.core.rate_limit import limiter
-
     limiter.reset()
 
     def _override_get_db():

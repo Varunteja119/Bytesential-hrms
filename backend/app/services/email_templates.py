@@ -1,14 +1,4 @@
-"""
-Email content, rendered from template files under app/templates/emails/.
-
-Previously these were Python f-strings inline in this module. Moved to real
-template files per the mandated project structure — same public function
-signatures (`welcome_email(...)`, `password_reset_email(...)` both still
-return `(subject, body)`), so `email_client` callers and tests didn't need
-to change.
-"""
 from pathlib import Path
-
 from jinja2 import Environment, FileSystemLoader
 
 _TEMPLATES_DIR = Path(__file__).resolve().parents[1] / "templates" / "emails"

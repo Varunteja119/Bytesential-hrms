@@ -1,5 +1,4 @@
 import uuid
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -11,13 +10,8 @@ from app.database.connection.database import get_db
 from app.database.models.employee import Employee, EmploymentStatus
 from app.database.models.recruitment import Candidate
 from app.database.models.user import User
-from app.database.schemas.employee import (
-    EmployeeAdminUpdate,
-    EmployeeOut,
-    EmployeeProfileUpdate,
-    ProvisionEmployeeRequest,
-    ProvisionEmployeeResponse,
-)
+from app.database.schemas.employee import (EmployeeAdminUpdate, EmployeeOut, EmployeeProfileUpdate,
+                                            ProvisionEmployeeRequest, ProvisionEmployeeResponse)
 from app.services.email_client import EmailClient, get_email_client
 
 router = APIRouter(prefix="/employees", tags=["employees"])

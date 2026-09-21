@@ -1,5 +1,4 @@
 import uuid
-
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session, joinedload
 
@@ -9,15 +8,8 @@ from app.dependencies.auth import get_current_user, require_permission
 from app.database.connection.database import get_db
 from app.database.models.recruitment import Candidate, CandidateStatus, Job
 from app.database.models.user import User
-from app.database.schemas.recruitment import (
-    CandidateCreate,
-    CandidateOut,
-    CandidateStatusUpdate,
-    JobCreate,
-    JobOut,
-    JobUpdate,
-    SimilarCandidateOut,
-)
+from app.database.schemas.recruitment import (CandidateCreate, CandidateOut, CandidateStatusUpdate, JobCreate, JobOut,
+                                               JobUpdate, SimilarCandidateOut)
 from app.services.llm_client import LLMClient, get_llm_client
 from app.services.resume_parser import extract_text
 from app.services.storage import StorageClient, get_storage_client

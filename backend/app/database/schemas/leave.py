@@ -1,8 +1,6 @@
 import uuid
 from datetime import date, datetime
-
 from pydantic import BaseModel, ConfigDict
-
 from app.database.models.leave import LeaveStatus, LeaveType
 
 
@@ -23,7 +21,6 @@ class LeaveRejectRequest(BaseModel):
 
 class LeaveRequestOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-
     id: uuid.UUID
     employee_id: uuid.UUID
     leave_type: LeaveType
@@ -39,7 +36,6 @@ class LeaveRequestOut(BaseModel):
 
 class LeaveBalanceOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-
     leave_type: LeaveType
     year: int
     allocated_days: int
@@ -48,10 +44,5 @@ class LeaveBalanceOut(BaseModel):
 
     @classmethod
     def from_orm_balance(cls, balance) -> "LeaveBalanceOut":
-        return cls(
-            leave_type=balance.leave_type,
-            year=balance.year,
-            allocated_days=balance.allocated_days,
-            used_days=balance.used_days,
-            remaining_days=balance.allocated_days - balance.used_days,
-        )
+        return cls(leave_type=balance.leave_type, year=balance.year, allocated_days=balance.allocated_days,
+                    used_days=balance.used_days, remaining_days=balance.allocated_days - balance.used_days)

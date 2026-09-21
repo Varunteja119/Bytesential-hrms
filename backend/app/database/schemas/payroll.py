@@ -1,8 +1,6 @@
 import uuid
 from datetime import date, datetime
-
 from pydantic import BaseModel, ConfigDict, Field
-
 from app.database.models.payroll import PayrollRunStatus
 
 
@@ -66,16 +64,13 @@ class PayrollRunOut(BaseModel):
 
     @classmethod
     def from_orm_run(cls, run) -> "PayrollRunOut":
-        return cls(
-            id=run.id, period_year=run.period_year, period_month=run.period_month, status=run.status,
-            hr_approved_by_id=run.hr_approved_by_id, hr_approved_at=run.hr_approved_at,
-            finance_approved_by_id=run.finance_approved_by_id, finance_approved_at=run.finance_approved_at,
-            paid_at=run.paid_at, payslip_count=len(run.payslips),
-        )
+        return cls(id=run.id, period_year=run.period_year, period_month=run.period_month, status=run.status,
+                    hr_approved_by_id=run.hr_approved_by_id, hr_approved_at=run.hr_approved_at,
+                    finance_approved_by_id=run.finance_approved_by_id, finance_approved_at=run.finance_approved_at,
+                    paid_at=run.paid_at, payslip_count=len(run.payslips))
 
 
 class PayslipUpdate(BaseModel):
-    """HR/Finance manual adjustments before approval -- TDS, overtime, bonus."""
     tds_amount: float | None = Field(default=None, ge=0)
     overtime_amount: float | None = Field(default=None, ge=0)
     bonus_amount: float | None = Field(default=None, ge=0)

@@ -8,7 +8,9 @@ _ALLOWED_TRANSITIONS = {
     CandidateStatus.INTERVIEW: {CandidateStatus.HR_APPROVAL, CandidateStatus.REJECTED, CandidateStatus.WITHDRAWN},
     CandidateStatus.HR_APPROVAL: {CandidateStatus.OFFERED, CandidateStatus.REJECTED, CandidateStatus.WITHDRAWN},
     CandidateStatus.OFFERED: {CandidateStatus.ACCEPTED, CandidateStatus.REJECTED, CandidateStatus.WITHDRAWN},
-    CandidateStatus.ACCEPTED: set(), CandidateStatus.REJECTED: set(), CandidateStatus.WITHDRAWN: set(),
+    CandidateStatus.ACCEPTED: set(),
+    CandidateStatus.REJECTED: set(),
+    CandidateStatus.WITHDRAWN: set(),
 }
 
 

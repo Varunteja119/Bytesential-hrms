@@ -1,8 +1,6 @@
 import io
-
 import pdfplumber
 from docx import Document
-
 from app.core.exceptions import AppError
 
 SUPPORTED_EXTENSIONS = {".pdf", ".docx"}

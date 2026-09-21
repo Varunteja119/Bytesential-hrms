@@ -1,6 +1,5 @@
 import json
 import re
-
 from app.core.exceptions import AppError
 
 _SCREENING_PROMPT_TEMPLATE = """You are an HR resume screening assistant. Compare the candidate's resume \
@@ -31,14 +30,12 @@ def parse_screening_response(raw_response: str) -> tuple[float, str]:
             parsed = _try_json_parse(match.group(0))
     if parsed is None:
         raise AppError(f"Could not parse a score from the LLM response: {raw_response[:200]!r}", status_code=502)
-
     score = parsed.get("score")
     summary = parsed.get("summary")
     if not isinstance(score, (int, float)):
         raise AppError(f"LLM response missing a valid numeric 'score': {parsed}", status_code=502)
     if not isinstance(summary, str) or not summary.strip():
         raise AppError(f"LLM response missing a 'summary': {parsed}", status_code=502)
-
     score = max(0.0, min(100.0, float(score)))
     return score, summary.strip()
 

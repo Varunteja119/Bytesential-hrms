@@ -1,8 +1,6 @@
 from typing import Protocol
-
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
-
 from app.config.settings import settings
 from app.core.exceptions import AppError
 
@@ -41,9 +39,5 @@ class MinIOStorageClient:
 
 
 def get_storage_client() -> StorageClient:
-    return MinIOStorageClient(
-        endpoint_url=settings.minio_endpoint_url,
-        access_key=settings.minio_access_key,
-        secret_key=settings.minio_secret_key,
-        bucket=settings.minio_bucket_resumes,
-    )
+    return MinIOStorageClient(endpoint_url=settings.minio_endpoint_url, access_key=settings.minio_access_key,
+                               secret_key=settings.minio_secret_key, bucket=settings.minio_bucket_resumes)

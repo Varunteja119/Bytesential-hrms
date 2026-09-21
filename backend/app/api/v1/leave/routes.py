@@ -1,6 +1,5 @@
 import uuid
 from datetime import date
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -8,14 +7,9 @@ from app.business.leave import LEAVE_ALLOCATIONS, approve_leave, apply_leave, ca
 from app.dependencies.auth import get_current_user, require_permission
 from app.database.connection.database import get_db
 from app.database.models.employee import Employee
-from app.database.models.leave import LeaveRequest, LeaveType
+from app.database.models.leave import LeaveRequest
 from app.database.models.user import User
-from app.database.schemas.leave import (
-    LeaveApplyRequest,
-    LeaveBalanceOut,
-    LeaveRejectRequest,
-    LeaveRequestOut,
-)
+from app.database.schemas.leave import LeaveApplyRequest, LeaveBalanceOut, LeaveRejectRequest, LeaveRequestOut
 
 router = APIRouter(prefix="/leave", tags=["leave"])
 
@@ -60,16 +54,12 @@ def get_my_leave_balance(year: int | None = None, db: Session = Depends(get_db),
 def cancel(request_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     employee = _get_own_employee_record(db, current_user)
     request = _get_request_or_404(db, request_id)
-    updated = cancel_leave(db, request, employee)  # raises AppError (403) if not own request, (400) if not pending
+    updated = cancel_leave(db, request, employee)
     return LeaveRequestOut.model_validate(updated)
 
 
 @router.get("", response_model=list[LeaveRequestOut], dependencies=[Depends(require_permission("leave:read"))])
-def list_leave_requests(
-    employee_id: uuid.UUID | None = None,
-    status_filter: str | None = None,
-    db: Session = Depends(get_db),
-):
+def list_leave_requests(employee_id: uuid.UUID | None = None, status_filter: str | None = None, db: Session = Depends(get_db)):
     query = db.query(LeaveRequest)
     if employee_id is not None:
         query = query.filter(LeaveRequest.employee_id == employee_id)
@@ -81,7 +71,7 @@ def list_leave_requests(
 @router.post("/{request_id}/approve", response_model=LeaveRequestOut, dependencies=[Depends(require_permission("leave:approve"))])
 def approve(request_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     request = _get_request_or_404(db, request_id)
-    updated = approve_leave(db, request, current_user)  # raises AppError (400) if not pending
+    updated = approve_leave(db, request, current_user)
     return LeaveRequestOut.model_validate(updated)
 
 

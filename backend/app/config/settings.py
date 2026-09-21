@@ -10,7 +10,6 @@ class Settings(BaseSettings):
     frontend_url: str = "http://localhost:3000"
 
     database_url: str
-
     redis_url: str = "redis://localhost:6379/0"
 
     secret_key: str
@@ -31,6 +30,8 @@ class Settings(BaseSettings):
     minio_secret_key: str = "minioadmin123"
     minio_bucket_resumes: str = "resumes"
 
+    chroma_persist_dir: str = "./chroma_data"
+
     smtp_host: str = "localhost"
     smtp_port: int = 587
     smtp_username: str | None = None
@@ -38,14 +39,10 @@ class Settings(BaseSettings):
     smtp_from_email: str = "no-reply@bytesentinel.local"
     smtp_use_tls: bool = True
 
-    chroma_persist_dir: str = "./chroma_data"
-
-    # Attendance policy — SRS doesn't specify exact numbers; these are configurable
-    # defaults. Adjust per actual company policy once defined.
     work_start_hour: int = 9
     work_start_minute: int = 30
-    late_grace_minutes: int = 15  # check-in after start+grace is marked late
-    half_day_hours_threshold: float = 4.0  # work_hours below this on checkout -> half_day
+    late_grace_minutes: int = 15
+    half_day_hours_threshold: float = 4.0
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

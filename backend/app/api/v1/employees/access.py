@@ -1,15 +1,6 @@
-"""
-Shared access-control helpers for anything that operates on an Employee
-record. Split out so employees/, documents/, and onboarding/ route
-modules can all use the same "is this my own record, or do I have the
-permission to act on someone else's" logic without importing from each
-other's route files.
-"""
 import uuid
-
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
-
 from app.database.models.employee import Employee
 from app.database.models.user import User
 

@@ -1,7 +1,5 @@
 from typing import Protocol
-
 import httpx
-
 from app.config.settings import settings
 from app.core.exceptions import AppError
 
@@ -43,10 +41,20 @@ class OllamaClient:
 
 class MockLLMClient:
     def generate(self, prompt: str) -> str:
+        prompt_lower = prompt.lower()
+        if "recommend one action" in prompt_lower or "performance-review" in prompt_lower or "manager rating" in prompt_lower:
+            return '{"action": "salary_hike", "hike_percent": 10.0, "summary": "Exceeded performance targets, recommended for salary hike."}'
+        elif "attrition" in prompt_lower or "risk_level" in prompt_lower:
+            return '{"risk_level": "low", "reasoning": "High performance rating and regular attendance."}'
+        elif "hr policy assistant" in prompt_lower or "policy excerpts" in prompt_lower:
+            return "According to company policy, employees are eligible for leaves and standard benefits."
         return '{"score": 88, "summary": "Strong match for the role."}'
 
     def embed(self, text: str) -> list[float]:
-        return [float(len(text) % 10), 0.0, 0.0]
+        import hashlib
+        h = hashlib.sha256(text.encode()).digest()
+        base = [float(b) / 255.0 for b in h]
+        return (base * 24)[:768]
 
 
 def get_llm_client() -> LLMClient:

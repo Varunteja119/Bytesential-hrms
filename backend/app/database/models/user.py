@@ -1,5 +1,6 @@
 from sqlalchemy import Boolean, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from app.database.connection.database import Base
 from app.database.models.mixins import UUIDPrimaryKeyMixin, TimestampMixin
 from app.database.models.rbac import user_roles, Role
