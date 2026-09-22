@@ -8,6 +8,7 @@ import Leave from "./pages/leave/Leave"
 import Payroll from "./pages/payroll/Payroll"
 import AIChat from "./pages/ai-chat/AIChat"
 import Attendance from "./pages/attendance/Attendance"
+import Analytics from "./pages/analytics/Analytics"
 import VerificationQueue from "./pages/hr/VerificationQueue"
 import Provision from "./pages/hr/Provision"
 import Onboarding from "./pages/onboarding/Onboarding"
@@ -20,7 +21,6 @@ function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/change-password" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
 
-      {/* HR/Admin only */}
       <Route path="/dashboard" element={<ProtectedRoute roles={["hr_manager", "admin"]}><Dashboard /></ProtectedRoute>} />
       <Route path="/employees" element={<ProtectedRoute roles={["hr_manager", "admin"]}><Employees /></ProtectedRoute>} />
       <Route path="/recruitment" element={<ProtectedRoute roles={["hr_manager", "admin"]}><Recruitment /></ProtectedRoute>} />
@@ -28,12 +28,10 @@ function App() {
       <Route path="/payroll" element={<ProtectedRoute roles={["hr_manager", "admin"]}><Payroll /></ProtectedRoute>} />
       <Route path="/ai-chat" element={<ProtectedRoute roles={["hr_manager", "admin"]}><AIChat /></ProtectedRoute>} />
       <Route path="/attendance" element={<ProtectedRoute roles={["hr_manager", "admin"]}><Attendance /></ProtectedRoute>} />
-      <Route path="/analytics" element={<ProtectedRoute roles={["hr_manager", "admin"]}><div className="p-8"><h1 className="text-2xl font-bold">Analytics — Coming Soon</h1></div></ProtectedRoute>} />
+      <Route path="/analytics" element={<ProtectedRoute roles={["hr_manager", "admin"]}><Analytics /></ProtectedRoute>} />
       <Route path="/finance" element={<ProtectedRoute roles={["hr_manager", "admin"]}><div className="p-8"><h1 className="text-2xl font-bold">Finance — Coming Soon</h1></div></ProtectedRoute>} />
       <Route path="/hr/verification" element={<ProtectedRoute roles={["hr_manager", "admin"]}><VerificationQueue /></ProtectedRoute>} />
       <Route path="/hr/provision" element={<ProtectedRoute roles={["hr_manager", "admin"]}><Provision /></ProtectedRoute>} />
-
-      {/* Employee onboarding */}
       <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
     </Routes>
   )
